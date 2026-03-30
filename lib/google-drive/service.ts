@@ -142,3 +142,56 @@ export async function ensureWorkspaceFolderTree(workspaceName: string): Promise<
         taskAttachmentsFolderId,
     };
 }
+
+/**
+ * List all items (folders and files) inside a Drive folder.
+ * Returns non-trashed items sorted by folder-first, then by name.
+ */
+export async function listFolderContents(
+    folderId: string
+): Promise<
+    Array<{
+        id: string;
+        name: string;
+        mimeType: string;
+        webViewLink: string | null;
+        createdTime: string | null;
+    }>
+> {
+    const drive = createDriveClient();
+    const items: Array<{
+        id: string;
+        name: string;
+        mimeType: string;
+        webViewLink: string | null;
+        createdTime: string | null;
+    }> = [];
+
+    let pageToken: string | undefined;
+    do {
+        const response = await drive.files.list({
+            q: `'${folderId}' in parents and trashed = false`,
+            fields: 'nextPageToken, files(id, name, mimeType, webViewLink, createdTime)',
+            orderBy: 'folder, name',
+            pageSize: 1000,
+            pageToken,
+            supportsAllDrives: true,
+            includeItemsFromAllDrives: true,
+        });
+
+        for (const file of response.data.files || []) {
+            items.push({
+                id: file.id || '',
+                name: file.name || 'Untitled',
+                mimeType: file.mimeType || '',
+                webViewLink: file.webViewLink || null,
+                createdTime: file.createdTime || null,
+            });
+        }
+
+        pageToken = response.data.nextPageToken || undefined;
+    } while (pageToken);
+
+    return items;
+}
+

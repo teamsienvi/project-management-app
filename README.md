@@ -67,6 +67,10 @@ See [.env.example](.env.example) for the full list. Key variables:
 | `GOOGLE_DRIVE_CLIENT_SECRET` | ✅ | Google OAuth2 client secret |
 | `GOOGLE_DRIVE_REFRESH_TOKEN` | ✅ | Pre-obtained OAuth2 refresh token |
 | `GOOGLE_DRIVE_ROOT_FOLDER_ID` | ✅ | Root folder ID in Google Drive |
+| `RESEND_API_KEY` | ❌ | Resend API key for email invites |
+| `RESEND_FROM_EMAIL` | ❌ | Sender address (e.g., noreply@yourdomain.com) |
+| `RESEND_REPLY_TO` | ❌ | Reply-to address for invite emails |
+| `APP_BRAND_NAME` | ❌ | App display name (default: IWPM) |
 
 ## NPM Scripts
 

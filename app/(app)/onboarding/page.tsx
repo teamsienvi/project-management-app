@@ -41,10 +41,31 @@ export default function OnboardingPage() {
         setLoading(true);
         setError('');
 
-        const res = await fetch('/api/invites/accept', {
+        const code = inviteCode.trim();
+
+        // If it looks like a UUID (36 chars), try the email-invite token flow first
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(code);
+
+        if (isUuid) {
+            const res = await fetch('/api/invites/accept', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ token: code }),
+            });
+            const data = await res.json();
+            if (res.ok) {
+                router.push(`/workspace/${data.workspace.id}`);
+                router.refresh();
+                return;
+            }
+            // If the token didn't work, fall through to join-by-code
+        }
+
+        // Try workspace join code
+        const res = await fetch('/api/invites/join-by-code', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ token: inviteCode.trim() }),
+            body: JSON.stringify({ code }),
         });
 
         const data = await res.json();
@@ -148,7 +169,7 @@ export default function OnboardingPage() {
                                 id="invite-code"
                                 className="form-input"
                                 type="text"
-                                placeholder="Paste the invite code from your colleague"
+                                placeholder="e.g., a1b2c3d4"
                                 value={inviteCode}
                                 onChange={(e) => setInviteCode(e.target.value)}
                                 required

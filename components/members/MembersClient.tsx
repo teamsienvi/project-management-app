@@ -7,7 +7,6 @@ interface Invitation {
     id: string;
     email: string;
     role: string;
-    token: string;
     status: string;
     expires_at: string | null;
     created_at: string;
@@ -15,7 +14,7 @@ interface Invitation {
 
 interface MembersClientProps {
     members: any[];
-    workspace: { name: string };
+    workspace: { name: string; join_code: string; join_code_enabled: boolean };
     workspaceId: string;
     currentUserRole: string;
     currentUserId: string;
@@ -28,16 +27,24 @@ export default function MembersClient({ members, workspace, workspaceId, current
     const [inviteRole, setInviteRole] = useState('member');
     const [inviting, setInviting] = useState(false);
     const [inviteMsg, setInviteMsg] = useState('');
-    const [newInviteToken, setNewInviteToken] = useState('');
-    const [copiedToken, setCopiedToken] = useState('');
+
+    const [joinCode, setJoinCode] = useState(workspace.join_code);
+    const [joinCodeEnabled, setJoinCodeEnabled] = useState(workspace.join_code_enabled);
+    const [copiedCode, setCopiedCode] = useState(false);
+    const [rotatingCode, setRotatingCode] = useState(false);
 
     const canManage = currentUserRole === 'owner' || currentUserRole === 'manager';
+    const isOwner = currentUserRole === 'owner';
+
+    const getInitials = (name: string | null) => {
+        if (!name) return '?';
+        return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+    };
 
     async function handleInvite(e: FormEvent) {
         e.preventDefault();
         setInviting(true);
         setInviteMsg('');
-        setNewInviteToken('');
         const res = await fetch(`/api/workspaces/${workspaceId}/invite`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -45,8 +52,7 @@ export default function MembersClient({ members, workspace, workspaceId, current
         });
         const data = await res.json();
         if (res.ok) {
-            setInviteMsg('Invitation created! Share the invite code below with your colleague.');
-            setNewInviteToken(data.invitation.token);
+            setInviteMsg(data.emailSent ? 'Invitation email sent!' : 'Invitation created (email delivery was skipped).');
             setInviteEmail('');
         } else {
             setInviteMsg(data.error || 'Failed to send invite');
@@ -63,46 +69,144 @@ export default function MembersClient({ members, workspace, workspaceId, current
         window.location.reload();
     }
 
-    function copyToClipboard(token: string) {
-        navigator.clipboard.writeText(token);
-        setCopiedToken(token);
-        setTimeout(() => setCopiedToken(''), 2000);
+    function copyJoinCode() {
+        navigator.clipboard.writeText(joinCode);
+        setCopiedCode(true);
+        setTimeout(() => setCopiedCode(false), 2000);
+    }
+
+    async function rotateJoinCode() {
+        if (!confirm('Rotate the invite code? The current code will stop working.')) return;
+        setRotatingCode(true);
+        const res = await fetch(`/api/workspaces/${workspaceId}/join-code`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'rotate' }),
+        });
+        if (res.ok) {
+            const data = await res.json();
+            setJoinCode(data.joinCode);
+        }
+        setRotatingCode(false);
+    }
+
+    async function toggleJoinCode() {
+        const action = joinCodeEnabled ? 'disable' : 'enable';
+        const res = await fetch(`/api/workspaces/${workspaceId}/join-code`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action }),
+        });
+        if (res.ok) {
+            const data = await res.json();
+            setJoinCodeEnabled(data.joinCodeEnabled);
+        }
     }
 
     return (
         <div>
+            {/* Header */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-lg)' }}>
                 <div>
-                    <h1 style={{ fontSize: 'var(--font-2xl)', fontWeight: 700 }}>Members</h1>
-                    <p style={{ color: 'var(--text-tertiary)', fontSize: 'var(--font-sm)' }}>{workspace.name} · {members.length} members</p>
+                    <h1 style={{ fontSize: 'var(--font-2xl)', fontWeight: 700 }}>Team</h1>
+                    <p style={{ color: 'var(--text-tertiary)', fontSize: 'var(--font-sm)' }}>
+                        {workspace.name} · {members.length} member{members.length !== 1 ? 's' : ''}
+                    </p>
                 </div>
                 {canManage && (
-                    <button className="btn btn-primary" onClick={() => { setShowInvite(true); setNewInviteToken(''); setInviteMsg(''); }}>+ Invite Member</button>
+                    <button className="btn btn-primary" onClick={() => { setShowInvite(true); setInviteMsg(''); }}>
+                        + Invite
+                    </button>
                 )}
             </div>
 
-            <div className="glass-card" style={{ overflow: 'hidden' }}>
+            {/* Workspace Invite Code */}
+            {canManage && (
+                <div style={{
+                    padding: 'var(--space-md) var(--space-lg)',
+                    background: 'var(--bg-surface)',
+                    border: '1px solid var(--border-default)',
+                    borderRadius: 'var(--radius-lg)',
+                    marginBottom: 'var(--space-lg)',
+                }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-xs)' }}>
+                        <span style={{ fontSize: 'var(--font-sm)', fontWeight: 600, color: 'var(--text-secondary)' }}>Invite Code</span>
+                        {isOwner && (
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: 'var(--font-xs)', color: 'var(--text-tertiary)', cursor: 'pointer' }}>
+                                <input type="checkbox" checked={joinCodeEnabled} onChange={toggleJoinCode} style={{ cursor: 'pointer' }} />
+                                {joinCodeEnabled ? 'Active' : 'Disabled'}
+                            </label>
+                        )}
+                    </div>
+                    <p style={{ color: 'var(--text-tertiary)', fontSize: 'var(--font-xs)', marginBottom: 'var(--space-sm)' }}>
+                        Share this code so others can join as a member.
+                    </p>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-sm)' }}>
+                        <code style={{
+                            flex: 1,
+                            fontSize: 'var(--font-lg)',
+                            fontWeight: 700,
+                            letterSpacing: '0.1em',
+                            background: 'var(--bg-tertiary)',
+                            padding: '6px var(--space-md)',
+                            borderRadius: 'var(--radius-sm)',
+                            textAlign: 'center',
+                            color: joinCodeEnabled ? 'var(--accent-cyan)' : 'var(--text-muted)',
+                            opacity: joinCodeEnabled ? 1 : 0.5,
+                            userSelect: 'all',
+                            border: '1px solid var(--border-subtle)',
+                        }}>{joinCode}</code>
+                        <button className="btn btn-sm btn-secondary" onClick={copyJoinCode} disabled={!joinCodeEnabled}>
+                            {copiedCode ? '✓ Copied' : 'Copy'}
+                        </button>
+                        {isOwner && (
+                            <button className="btn btn-sm btn-ghost" onClick={rotateJoinCode} disabled={rotatingCode}>
+                                {rotatingCode ? '...' : 'Rotate'}
+                            </button>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {/* Members List */}
+            <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-default)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
                 <table className="data-table">
                     <thead>
-                        <tr><th>Member</th><th>Role</th><th>Joined</th>{currentUserRole === 'owner' && <th>Actions</th>}</tr>
+                        <tr>
+                            <th>Member</th>
+                            <th>Role</th>
+                            <th>Joined</th>
+                            {isOwner && <th style={{ width: 120 }}>Actions</th>}
+                        </tr>
                     </thead>
                     <tbody>
                         {members.map((m: any) => (
                             <tr key={m.id}>
-                                <td style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-sm)' }}>
-                                    <div className="avatar avatar-sm">{m.profiles?.full_name?.[0]?.toUpperCase() || '?'}</div>
-                                    <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>
-                                        {m.profiles?.full_name || 'Unknown'} {m.user_id === currentUserId && <span style={{ color: 'var(--text-tertiary)' }}>(you)</span>}
-                                    </span>
+                                <td>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-sm)' }}>
+                                        <div className="avatar avatar-sm" style={{ fontSize: '9px' }}>
+                                            {getInitials(m.profiles?.full_name || null)}
+                                        </div>
+                                        <span style={{ color: 'var(--text-primary)', fontWeight: 500, fontSize: 'var(--font-sm)' }}>
+                                            {m.profiles?.full_name || 'Unknown'}
+                                            {m.user_id === currentUserId && <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}> (you)</span>}
+                                        </span>
+                                    </div>
                                 </td>
                                 <td>
                                     <span className={`badge ${m.role === 'owner' ? 'badge-cyan' : m.role === 'manager' ? 'badge-violet' : 'badge-magenta'}`}>{m.role}</span>
                                 </td>
-                                <td>{new Date(m.joined_at).toLocaleDateString()}</td>
-                                {currentUserRole === 'owner' && (
+                                <td style={{ fontSize: 'var(--font-xs)', color: 'var(--text-tertiary)' }}>{new Date(m.joined_at).toLocaleDateString()}</td>
+                                {isOwner && (
                                     <td>
                                         {m.role !== 'owner' && m.user_id !== currentUserId && (
-                                            <select className="form-input" style={{ width: 'auto', padding: '4px 8px', fontSize: 'var(--font-sm)' }} value={m.role} onChange={(e) => handleRoleChange(m.id, e.target.value)} aria-label={`Change role for ${m.profiles?.full_name}`}>
+                                            <select
+                                                className="form-input"
+                                                style={{ width: 'auto', padding: '3px 6px', fontSize: 'var(--font-xs)' }}
+                                                value={m.role}
+                                                onChange={(e) => handleRoleChange(m.id, e.target.value)}
+                                                aria-label={`Change role for ${m.profiles?.full_name}`}
+                                            >
                                                 <option value="manager">Manager</option>
                                                 <option value="member">Member</option>
                                             </select>
@@ -115,49 +219,24 @@ export default function MembersClient({ members, workspace, workspaceId, current
                 </table>
             </div>
 
-            {/* Pending Invitations Section */}
+            {/* Pending Invitations */}
             {canManage && pendingInvitations.length > 0 && (
                 <div style={{ marginTop: 'var(--space-xl)' }}>
-                    <h2 style={{ fontSize: 'var(--font-lg)', fontWeight: 600, marginBottom: 'var(--space-md)' }}>
-                        Pending Invitations
+                    <h2 style={{ fontSize: 'var(--font-md)', fontWeight: 600, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 'var(--space-sm)' }}>
+                        Pending Invitations · {pendingInvitations.length}
                     </h2>
-                    <div className="glass-card" style={{ overflow: 'hidden' }}>
+                    <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-default)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
                         <table className="data-table">
                             <thead>
-                                <tr><th>Email</th><th>Role</th><th>Invite Code</th><th>Expires</th></tr>
+                                <tr><th>Email</th><th>Role</th><th>Sent</th><th>Expires</th></tr>
                             </thead>
                             <tbody>
                                 {pendingInvitations.map((inv) => (
                                     <tr key={inv.id}>
-                                        <td style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{inv.email}</td>
-                                        <td>
-                                            <span className={`badge ${inv.role === 'manager' ? 'badge-violet' : 'badge-magenta'}`}>{inv.role}</span>
-                                        </td>
-                                        <td>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-xs)' }}>
-                                                <code style={{
-                                                    fontSize: 'var(--font-xs)',
-                                                    background: 'var(--bg-tertiary)',
-                                                    padding: '2px 6px',
-                                                    borderRadius: 'var(--radius-sm)',
-                                                    maxWidth: 140,
-                                                    overflow: 'hidden',
-                                                    textOverflow: 'ellipsis',
-                                                    whiteSpace: 'nowrap',
-                                                }}>{inv.token}</code>
-                                                <button
-                                                    type="button"
-                                                    className="btn btn-secondary"
-                                                    style={{ padding: '2px 8px', fontSize: 'var(--font-xs)', minWidth: 'auto' }}
-                                                    onClick={() => copyToClipboard(inv.token)}
-                                                >
-                                                    {copiedToken === inv.token ? '✓ Copied' : 'Copy'}
-                                                </button>
-                                            </div>
-                                        </td>
-                                        <td style={{ fontSize: 'var(--font-sm)', color: 'var(--text-tertiary)' }}>
-                                            {inv.expires_at ? new Date(inv.expires_at).toLocaleDateString() : '—'}
-                                        </td>
+                                        <td style={{ color: 'var(--text-primary)', fontWeight: 500, fontSize: 'var(--font-sm)' }}>{inv.email}</td>
+                                        <td><span className={`badge ${inv.role === 'manager' ? 'badge-violet' : 'badge-magenta'}`}>{inv.role}</span></td>
+                                        <td style={{ fontSize: 'var(--font-xs)', color: 'var(--text-tertiary)' }}>{new Date(inv.created_at).toLocaleDateString()}</td>
+                                        <td style={{ fontSize: 'var(--font-xs)', color: 'var(--text-tertiary)' }}>{inv.expires_at ? new Date(inv.expires_at).toLocaleDateString() : '—'}</td>
                                     </tr>
                                 ))}
                             </tbody>
@@ -166,71 +245,49 @@ export default function MembersClient({ members, workspace, workspaceId, current
                 </div>
             )}
 
+            {/* Invite Modal */}
             {showInvite && (
                 <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) setShowInvite(false); }} onKeyDown={(e) => { if (e.key === 'Escape') setShowInvite(false); }} role="dialog" aria-modal="true" aria-label="Invite member">
-                    <div className="glass-card" style={{ padding: 'var(--space-xl)', width: '100%', maxWidth: 440 }}>
-                        <h2 style={{ fontSize: 'var(--font-xl)', fontWeight: 600, marginBottom: 'var(--space-lg)' }}>Invite Member</h2>
-                        {inviteMsg && <div style={{ padding: 'var(--space-sm)', background: inviteMsg.includes('created') ? 'rgba(29,233,182,0.1)' : 'rgba(255,82,82,0.1)', borderRadius: 'var(--radius-md)', marginBottom: 'var(--space-md)', fontSize: 'var(--font-sm)', color: inviteMsg.includes('created') ? 'var(--status-success)' : 'var(--status-error)' }}>{inviteMsg}</div>}
-
-                        {/* Show the invite code after successful creation */}
-                        {newInviteToken && (
+                    <div style={{
+                        padding: 'var(--space-xl)',
+                        width: '100%',
+                        maxWidth: 420,
+                        background: 'var(--bg-elevated)',
+                        border: '1px solid var(--border-default)',
+                        borderRadius: 'var(--radius-lg)',
+                    }}>
+                        <h2 style={{ fontSize: 'var(--font-xl)', fontWeight: 600, marginBottom: 'var(--space-sm)' }}>Invite by Email</h2>
+                        <p style={{ color: 'var(--text-tertiary)', fontSize: 'var(--font-xs)', marginBottom: 'var(--space-md)' }}>
+                            They&apos;ll receive an email with a link to accept.
+                        </p>
+                        {inviteMsg && (
                             <div style={{
-                                padding: 'var(--space-md)',
-                                background: 'var(--bg-tertiary)',
+                                padding: 'var(--space-sm) var(--space-md)',
+                                background: inviteMsg.includes('sent') || inviteMsg.includes('created') ? 'rgba(77,182,172,0.08)' : 'rgba(239,83,80,0.08)',
+                                border: `1px solid ${inviteMsg.includes('sent') || inviteMsg.includes('created') ? 'rgba(77,182,172,0.15)' : 'rgba(239,83,80,0.15)'}`,
                                 borderRadius: 'var(--radius-md)',
-                                marginBottom: 'var(--space-lg)',
-                                border: '1px solid var(--border-default)',
-                            }}>
-                                <p style={{ fontSize: 'var(--font-sm)', color: 'var(--text-secondary)', marginBottom: 'var(--space-xs)' }}>
-                                    Share this invite code with your colleague:
-                                </p>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-sm)' }}>
-                                    <code style={{
-                                        flex: 1,
-                                        fontSize: 'var(--font-sm)',
-                                        background: 'var(--bg-primary)',
-                                        padding: 'var(--space-sm)',
-                                        borderRadius: 'var(--radius-sm)',
-                                        wordBreak: 'break-all',
-                                        userSelect: 'all',
-                                    }}>{newInviteToken}</code>
-                                    <button
-                                        type="button"
-                                        className="btn btn-primary"
-                                        style={{ padding: '6px 12px', fontSize: 'var(--font-sm)', minWidth: 'auto', whiteSpace: 'nowrap' }}
-                                        onClick={() => copyToClipboard(newInviteToken)}
-                                    >
-                                        {copiedToken === newInviteToken ? '✓ Copied!' : 'Copy'}
-                                    </button>
-                                </div>
+                                marginBottom: 'var(--space-md)',
+                                fontSize: 'var(--font-sm)',
+                                color: inviteMsg.includes('sent') || inviteMsg.includes('created') ? 'var(--status-success)' : 'var(--status-error)',
+                            }}>{inviteMsg}</div>
+                        )}
+                        <form onSubmit={handleInvite} className="auth-form">
+                            <div className="form-group">
+                                <label className="form-label" htmlFor="invite-email">Email</label>
+                                <input id="invite-email" className="form-input" type="email" value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} required placeholder="colleague@company.com" />
                             </div>
-                        )}
-
-                        {!newInviteToken && (
-                            <form onSubmit={handleInvite} className="auth-form">
-                                <div className="form-group">
-                                    <label className="form-label" htmlFor="invite-email">Email</label>
-                                    <input id="invite-email" className="form-input" type="email" value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} required placeholder="colleague@company.com" />
-                                </div>
-                                <div className="form-group">
-                                    <label className="form-label" htmlFor="invite-role">Role</label>
-                                    <select id="invite-role" className="form-input" value={inviteRole} onChange={(e) => setInviteRole(e.target.value)}>
-                                        <option value="member">Member</option>
-                                        <option value="manager">Manager</option>
-                                    </select>
-                                </div>
-                                <div style={{ display: 'flex', gap: 'var(--space-sm)', justifyContent: 'flex-end' }}>
-                                    <button type="button" className="btn btn-secondary" onClick={() => setShowInvite(false)}>Cancel</button>
-                                    <button type="submit" className="btn btn-primary" disabled={inviting}>{inviting ? 'Sending...' : 'Send Invite'}</button>
-                                </div>
-                            </form>
-                        )}
-
-                        {newInviteToken && (
-                            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                                <button type="button" className="btn btn-secondary" onClick={() => { setShowInvite(false); window.location.reload(); }}>Done</button>
+                            <div className="form-group">
+                                <label className="form-label" htmlFor="invite-role">Role</label>
+                                <select id="invite-role" className="form-input" value={inviteRole} onChange={(e) => setInviteRole(e.target.value)}>
+                                    <option value="member">Member</option>
+                                    <option value="manager">Manager</option>
+                                </select>
                             </div>
-                        )}
+                            <div style={{ display: 'flex', gap: 'var(--space-sm)', justifyContent: 'flex-end' }}>
+                                <button type="button" className="btn btn-secondary" onClick={() => setShowInvite(false)}>Cancel</button>
+                                <button type="submit" className="btn btn-primary" disabled={inviting}>{inviting ? 'Sending...' : 'Send Invite'}</button>
+                            </div>
+                        </form>
                     </div>
                 </div>
             )}

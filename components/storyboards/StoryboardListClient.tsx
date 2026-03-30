@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, type FormEvent } from 'react';
+import { useState, useEffect, useCallback, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 
 interface Folder {
@@ -8,14 +8,67 @@ interface Folder {
     name: string;
     description: string | null;
     created_at: string;
+    google_drive_folder_id?: string | null;
 }
 
-export default function StoryboardListClient({ folders: initialFolders, workspaceId }: { folders: Folder[]; workspaceId: string; role: string }) {
+interface DriveFile {
+    id: string;
+    name: string;
+    mimeType: string;
+    webViewLink: string | null;
+    createdTime: string | null;
+}
+
+function getDriveFileIcon(mimeType: string): string {
+    if (mimeType.includes('spreadsheet')) return '📊';
+    if (mimeType.includes('document')) return '📝';
+    if (mimeType.includes('presentation')) return '📽️';
+    if (mimeType.includes('image')) return '🖼️';
+    if (mimeType.includes('video')) return '🎬';
+    if (mimeType.includes('audio')) return '🎵';
+    if (mimeType.includes('pdf')) return '📕';
+    return '📄';
+}
+
+export default function StoryboardListClient({
+    folders: initialFolders,
+    driveFiles: initialDriveFiles = [],
+    workspaceId,
+}: {
+    folders: Folder[];
+    driveFiles?: DriveFile[];
+    workspaceId: string;
+    role: string;
+}) {
     const router = useRouter();
     const [folders, setFolders] = useState(initialFolders);
+    const [driveFiles, setDriveFiles] = useState(initialDriveFiles);
     const [showCreate, setShowCreate] = useState(false);
     const [newFolder, setNewFolder] = useState({ name: '', description: '' });
     const [creating, setCreating] = useState(false);
+    const [syncing, setSyncing] = useState(true);
+    const [deletingId, setDeletingId] = useState<string | null>(null);
+    const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+
+    const syncWithDrive = useCallback(async () => {
+        setSyncing(true);
+        try {
+            const res = await fetch(`/api/workspaces/${workspaceId}/storyboards/sync`);
+            if (res.ok) {
+                const data = await res.json();
+                if (data.folders) setFolders(data.folders);
+                if (data.driveFiles) setDriveFiles(data.driveFiles);
+            }
+        } catch (err) {
+            console.error('Drive sync failed:', err);
+        } finally {
+            setSyncing(false);
+        }
+    }, [workspaceId]);
+
+    useEffect(() => {
+        syncWithDrive();
+    }, [syncWithDrive]);
 
     async function handleCreate(e: FormEvent) {
         e.preventDefault();
@@ -34,39 +87,202 @@ export default function StoryboardListClient({ folders: initialFolders, workspac
         setCreating(false);
     }
 
+    async function doDelete(folderId: string) {
+        setDeletingId(folderId);
+        setConfirmDeleteId(null);
+        try {
+            const res = await fetch(`/api/workspaces/${workspaceId}/storyboards/${folderId}`, {
+                method: 'DELETE',
+            });
+            if (res.ok) {
+                setFolders((prev) => prev.filter(f => f.id !== folderId));
+            } else {
+                const text = await res.text();
+                console.error('Delete failed:', res.status, text);
+                alert('Failed to delete folder: ' + text);
+            }
+        } catch (err) {
+            console.error('Failed to delete folder:', err);
+            alert('Failed to delete folder');
+        } finally {
+            setDeletingId(null);
+        }
+    }
+
+    const syncedFolders = folders.filter(f => f.description === 'Synced from Google Drive');
+    const appFolders = folders.filter(f => f.description !== 'Synced from Google Drive');
+
+    function renderFolderCard(folder: Folder, isSynced = false) {
+        const isConfirming = confirmDeleteId === folder.id;
+        const isDeleting = deletingId === folder.id;
+
+        return (
+            <div
+                key={folder.id}
+                className="glass-card glow-hover"
+                style={{
+                    textAlign: 'left', width: '100%', fontFamily: 'var(--font-family)',
+                    border: '1px solid var(--border-default)',
+                    position: 'relative', overflow: 'hidden',
+                    ...(isSynced ? { background: '#f8f6f0' } : {}),
+                    ...(isDeleting ? { opacity: 0.5, pointerEvents: 'none' as const } : {}),
+                }}
+            >
+                {/* Confirm delete overlay */}
+                {isConfirming && (
+                    <div style={{
+                        position: 'absolute', inset: 0, zIndex: 10,
+                        background: 'rgba(255,255,255,0.95)', display: 'flex',
+                        flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                        gap: '8px', padding: '12px',
+                    }}>
+                        <p style={{ fontSize: 'var(--font-sm)', fontWeight: 500, textAlign: 'center' }}>
+                            Delete &quot;{folder.name}&quot;?
+                        </p>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                            <button
+                                className="btn btn-sm"
+                                style={{ background: '#e53e3e', color: 'white', border: 'none', padding: '4px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '13px' }}
+                                onClick={() => doDelete(folder.id)}
+                            >
+                                Delete
+                            </button>
+                            <button
+                                className="btn btn-sm"
+                                style={{ background: '#eee', border: '1px solid #ccc', padding: '4px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '13px' }}
+                                onClick={() => setConfirmDeleteId(null)}
+                            >
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                )}
+
+                {/* Delete trigger button */}
+                <button
+                    type="button"
+                    onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setConfirmDeleteId(folder.id);
+                    }}
+                    title="Delete folder"
+                    style={{
+                        position: 'absolute', top: 8, right: 8, zIndex: 5,
+                        background: 'rgba(255,255,255,0.85)', border: '1px solid #ddd',
+                        borderRadius: '6px', cursor: 'pointer', fontSize: '12px',
+                        padding: '3px 7px', lineHeight: 1, color: '#999',
+                        transition: 'all 0.15s',
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = '#fee2e2'; e.currentTarget.style.borderColor = '#e53e3e'; e.currentTarget.style.color = '#e53e3e'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.85)'; e.currentTarget.style.borderColor = '#ddd'; e.currentTarget.style.color = '#999'; }}
+                >
+                    ✕
+                </button>
+
+                {/* Clickable area for navigation */}
+                <div
+                    onClick={() => {
+                        if (!isConfirming) router.push(`/workspace/${workspaceId}/storyboards/${folder.id}`);
+                    }}
+                    style={{ padding: 'var(--space-lg)', cursor: isConfirming ? 'default' : 'pointer' }}
+                >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-sm)', marginBottom: 'var(--space-sm)' }}>
+                        <span style={{ fontSize: '24px' }}>📁</span>
+                        {isSynced && <span className="badge badge-success" style={{ fontSize: '9px' }}>DRIVE</span>}
+                    </div>
+                    <h3 style={{ fontSize: 'var(--font-lg)', fontWeight: 600, color: 'var(--text-primary)', marginBottom: 'var(--space-xs)' }}>{folder.name}</h3>
+                    {folder.description && folder.description !== 'Synced from Google Drive' && (
+                        <p style={{ fontSize: 'var(--font-sm)', color: 'var(--text-tertiary)' }}>{folder.description}</p>
+                    )}
+                    <p style={{ fontSize: 'var(--font-xs)', color: 'var(--text-muted)', marginTop: 'var(--space-sm)' }}>
+                        {isSynced ? 'Synced' : 'Created'} {new Date(folder.created_at).toLocaleDateString()}
+                    </p>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-lg)' }}>
-                <h1 style={{ fontSize: 'var(--font-2xl)', fontWeight: 700 }}>Storyboards</h1>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-sm)' }}>
+                    <h1 style={{ fontSize: 'var(--font-2xl)', fontWeight: 700 }}>Storyboards</h1>
+                    {syncing && (
+                        <span style={{ fontSize: 'var(--font-xs)', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <span style={{ display: 'inline-block', width: 12, height: 12, border: '2px solid transparent', borderTopColor: 'var(--accent-blue)', borderRadius: '50%', animation: 'spin 800ms linear infinite' }} />
+                            Syncing Drive…
+                        </span>
+                    )}
+                </div>
                 <button className="btn btn-primary" onClick={() => setShowCreate(true)}>+ New Folder</button>
             </div>
 
-            {folders.length === 0 ? (
+            {folders.length === 0 && driveFiles.length === 0 && !syncing ? (
                 <div className="empty-state">
                     <div className="empty-state-icon">⊞</div>
                     <div className="empty-state-title">No storyboard folders yet</div>
-                    <div className="empty-state-desc">Create a folder to start organizing your storyboards and files.</div>
+                    <div className="empty-state-desc">Create a folder to start organizing your storyboards.</div>
                 </div>
             ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 'var(--space-md)' }}>
-                    {folders.map((folder) => (
-                        <button
-                            key={folder.id}
-                            className="glass-card glow-hover"
-                            onClick={() => router.push(`/workspace/${workspaceId}/storyboards/${folder.id}`)}
-                            style={{ padding: 'var(--space-lg)', cursor: 'pointer', textAlign: 'left', width: '100%', fontFamily: 'var(--font-family)', border: '1px solid var(--glass-border)' }}
-                        >
-                            <div style={{ fontSize: '24px', marginBottom: 'var(--space-sm)' }}>📁</div>
-                            <h3 style={{ fontSize: 'var(--font-lg)', fontWeight: 600, color: 'var(--text-primary)', marginBottom: 'var(--space-xs)' }}>{folder.name}</h3>
-                            {folder.description && <p style={{ fontSize: 'var(--font-sm)', color: 'var(--text-tertiary)' }}>{folder.description}</p>}
-                            <p style={{ fontSize: 'var(--font-xs)', color: 'var(--text-muted)', marginTop: 'var(--space-sm)' }}>Created {new Date(folder.created_at).toLocaleDateString()}</p>
-                        </button>
-                    ))}
-                </div>
+                <>
+                    {appFolders.length > 0 && (
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 'var(--space-md)', marginBottom: 'var(--space-xl)' }}>
+                            {appFolders.map((folder) => renderFolderCard(folder, false))}
+                        </div>
+                    )}
+
+                    {syncedFolders.length > 0 && (
+                        <>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-sm)', marginBottom: 'var(--space-md)' }}>
+                                <span style={{ fontSize: 'var(--font-sm)', fontWeight: 600, color: 'var(--text-tertiary)' }}>📂 Synced from Google Drive</span>
+                                <div style={{ flex: 1, height: 1, background: 'var(--border-default)' }} />
+                            </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 'var(--space-md)', marginBottom: 'var(--space-xl)' }}>
+                                {syncedFolders.map((folder) => renderFolderCard(folder, true))}
+                            </div>
+                        </>
+                    )}
+
+                    {driveFiles.length > 0 && (
+                        <>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-sm)', marginBottom: 'var(--space-md)' }}>
+                                <span style={{ fontSize: 'var(--font-sm)', fontWeight: 600, color: 'var(--text-tertiary)' }}>📎 Files in Drive</span>
+                                <div style={{ flex: 1, height: 1, background: 'var(--border-default)' }} />
+                            </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 'var(--space-sm)' }}>
+                                {driveFiles.map((file) => (
+                                    <a
+                                        key={file.id}
+                                        href={file.webViewLink || '#'}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="glass-card glow-hover"
+                                        style={{
+                                            padding: 'var(--space-md)',
+                                            display: 'flex', alignItems: 'center', gap: 'var(--space-sm)',
+                                            textDecoration: 'none', color: 'inherit',
+                                            border: '1px solid var(--border-default)',
+                                        }}
+                                    >
+                                        <span style={{ fontSize: '20px', flexShrink: 0 }}>{getDriveFileIcon(file.mimeType)}</span>
+                                        <div style={{ overflow: 'hidden', flex: 1 }}>
+                                            <p style={{ fontSize: 'var(--font-sm)', fontWeight: 500, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{file.name}</p>
+                                            {file.createdTime && (
+                                                <p style={{ fontSize: 'var(--font-xs)', color: 'var(--text-muted)' }}>{new Date(file.createdTime).toLocaleDateString()}</p>
+                                            )}
+                                        </div>
+                                        <span style={{ fontSize: '10px', color: 'var(--text-muted)', flexShrink: 0 }}>↗</span>
+                                    </a>
+                                ))}
+                            </div>
+                        </>
+                    )}
+                </>
             )}
 
             {showCreate && (
-                <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) setShowCreate(false); }} onKeyDown={(e) => { if (e.key === 'Escape') setShowCreate(false); }} role="dialog" aria-modal="true" aria-label="Create folder">
+                <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) setShowCreate(false); }} role="dialog" aria-modal="true" aria-label="Create folder">
                     <div className="glass-card" style={{ padding: 'var(--space-xl)', width: '100%', maxWidth: 460 }}>
                         <h2 style={{ fontSize: 'var(--font-xl)', fontWeight: 600, marginBottom: 'var(--space-lg)' }}>New Storyboard Folder</h2>
                         <form onSubmit={handleCreate} className="auth-form">

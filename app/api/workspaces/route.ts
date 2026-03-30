@@ -45,6 +45,8 @@ export async function POST(request: NextRequest) {
                 name,
                 slug,
                 created_by: user.id,
+                join_code: uuidv4().slice(0, 8),
+                join_code_enabled: true,
                 google_drive_root_folder_id: driveFolders.rootFolderId,
                 google_drive_storyboards_folder_id: driveFolders.storyboardsFolderId,
                 google_drive_general_files_folder_id: driveFolders.generalFilesFolderId,
@@ -55,12 +57,19 @@ export async function POST(request: NextRequest) {
 
         if (wsError) return apiError(wsError.message, 500);
 
-        // Create owner membership
-        await adminSupabase.from('workspace_members').insert({
+        // Create owner membership — the workspace MUST have an owner
+        const { error: memberError } = await adminSupabase.from('workspace_members').insert({
             workspace_id: workspaceId,
             user_id: user.id,
             role: 'owner',
         });
+
+        if (memberError) {
+            // Roll back: delete the workspace so we don't orphan it
+            await adminSupabase.from('workspaces').delete().eq('id', workspaceId);
+            console.error('Owner membership insert failed:', memberError);
+            return apiError('Failed to create workspace membership', 500);
+        }
 
         return apiSuccess({ workspace }, 201);
     } catch (err) {

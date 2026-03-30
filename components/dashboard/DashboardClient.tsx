@@ -22,75 +22,65 @@ export default function DashboardClient({ workspaces }: DashboardClientProps) {
 
     return (
         <div>
+            {/* Header */}
             <div style={{ marginBottom: 'var(--space-xl)' }}>
-                <h1 style={{ fontSize: 'var(--font-3xl)', fontWeight: 800 }}>
-                    <span className="gradient-text">Dashboard</span>
+                <h1 style={{ fontSize: 'var(--font-2xl)', fontWeight: 700, color: 'var(--text-primary)' }}>
+                    Your Workspaces
                 </h1>
-                <p style={{ color: 'var(--text-secondary)', marginTop: 'var(--space-xs)' }}>
-                    Welcome back. Select a workspace to get started.
+                <p style={{ color: 'var(--text-tertiary)', fontSize: 'var(--font-sm)', marginTop: 'var(--space-xs)' }}>
+                    {workspaces.length} workspace{workspaces.length !== 1 ? 's' : ''}
                 </p>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 'var(--space-md)' }}>
+            {/* Workspace list */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', background: 'var(--border-subtle)', borderRadius: 'var(--radius-lg)', overflow: 'hidden', border: '1px solid var(--border-default)' }}>
                 {workspaces.map((ws) => (
                     <button
                         key={ws.workspace_id}
-                        className="glass-card glow-hover"
                         onClick={() => router.push(`/workspace/${ws.workspace_id}`)}
                         style={{
-                            padding: 'var(--space-lg)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 'var(--space-md)',
+                            padding: 'var(--space-md) var(--space-lg)',
+                            background: 'var(--bg-surface)',
+                            border: 'none',
                             cursor: 'pointer',
                             textAlign: 'left',
-                            border: '1px solid var(--glass-border)',
-                            width: '100%',
                             fontFamily: 'var(--font-family)',
+                            transition: 'background 120ms ease',
+                            width: '100%',
                         }}
+                        onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-elevated)'; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--bg-surface)'; }}
                     >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-md)', marginBottom: 'var(--space-md)' }}>
-                            <div
-                                className="avatar avatar-lg"
-                                style={{ background: 'var(--gradient-cool)' }}
-                            >
-                                {ws.workspaces?.name?.[0]?.toUpperCase() || '?'}
+                        <div className="avatar avatar-lg" style={{ background: 'var(--bg-tertiary)', color: 'var(--text-secondary)', fontSize: 'var(--font-lg)', fontWeight: 700 }}>
+                            {ws.workspaces?.name?.[0]?.toUpperCase() || '?'}
+                        </div>
+                        <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: 'var(--font-lg)', fontWeight: 600, color: 'var(--text-primary)' }}>
+                                {ws.workspaces?.name || 'Unnamed Workspace'}
                             </div>
-                            <div>
-                                <h3 style={{ fontSize: 'var(--font-xl)', fontWeight: 600, color: 'var(--text-primary)' }}>
-                                    {ws.workspaces?.name || 'Unnamed Workspace'}
-                                </h3>
-                                <span className={`badge ${ws.role === 'owner' ? 'badge-cyan' : ws.role === 'manager' ? 'badge-violet' : 'badge-magenta'}`}>
-                                    {ws.role}
-                                </span>
+                            <div style={{ fontSize: 'var(--font-xs)', color: 'var(--text-tertiary)', marginTop: '2px' }}>
+                                Joined {new Date(ws.joined_at).toLocaleDateString()}
                             </div>
                         </div>
-                        <p style={{ fontSize: 'var(--font-sm)', color: 'var(--text-tertiary)' }}>
-                            Joined {new Date(ws.joined_at).toLocaleDateString()}
-                        </p>
+                        <span className={`badge ${ws.role === 'owner' ? 'badge-cyan' : ws.role === 'manager' ? 'badge-violet' : 'badge-magenta'}`}>
+                            {ws.role}
+                        </span>
+                        <span style={{ color: 'var(--text-muted)', fontSize: '14px' }}>→</span>
                     </button>
                 ))}
+            </div>
 
-                {/* Add workspace card */}
+            {/* Create/Join action */}
+            <div style={{ marginTop: 'var(--space-lg)' }}>
                 <button
-                    className="glass-card glow-hover"
+                    className="btn btn-secondary"
                     onClick={() => router.push('/onboarding')}
-                    style={{
-                        padding: 'var(--space-lg)',
-                        cursor: 'pointer',
-                        textAlign: 'center',
-                        border: '1px dashed var(--border-default)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        minHeight: 140,
-                        fontFamily: 'var(--font-family)',
-                        width: '100%',
-                    }}
+                    style={{ width: '100%', justifyContent: 'center', padding: 'var(--space-md)' }}
                 >
-                    <div>
-                        <div style={{ fontSize: '32px', marginBottom: 'var(--space-sm)', opacity: 0.4 }}>+</div>
-                        <div style={{ color: 'var(--text-tertiary)', fontSize: 'var(--font-md)' }}>
-                            Create New Workspace
-                        </div>
-                    </div>
+                    + Create or Join Workspace
                 </button>
             </div>
         </div>

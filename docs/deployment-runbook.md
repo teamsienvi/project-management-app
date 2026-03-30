@@ -23,6 +23,16 @@ Add all variables from `.env.example` in Vercel project settings:
 - `GOOGLE_DRIVE_REFRESH_TOKEN`
 - `GOOGLE_DRIVE_ROOT_FOLDER_ID`
 - `GOOGLE_DRIVE_OWNER_EMAIL`
+- `RESEND_API_KEY` (optional — email invites)
+- `RESEND_FROM_EMAIL` (optional)
+- `RESEND_REPLY_TO` (optional)
+- `APP_BRAND_NAME` (optional, default: IWPM)
+
+### 3.1 Database Migrations
+Run in Supabase SQL Editor:
+- `db/migrations/001_initial_schema.sql`
+- `db/migrations/002_workspace_join_code.sql`
+- `db/policies/rls_policies.sql`
 
 ### 4. Deploy
 Click Deploy. Verify the build succeeds.

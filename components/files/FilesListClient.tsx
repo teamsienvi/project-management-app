@@ -4,20 +4,54 @@ import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-export default function FilesListClient({ files, workspaceId }: { files: any[]; workspaceId: string }) {
+export default function FilesListClient({ files: initialFiles, workspaceId }: { files: any[]; workspaceId: string }) {
     const router = useRouter();
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const [files, setFiles] = useState<any[]>(initialFiles);
     const [uploading, setUploading] = useState(false);
+    const [uploadMsg, setUploadMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
     async function handleUpload(file: File) {
         setUploading(true);
+        setUploadMsg(null);
+
         const formData = new FormData();
         formData.append('file', file);
         formData.append('workspaceId', workspaceId);
         formData.append('targetFolderType', 'general');
-        await fetch('/api/files/upload', { method: 'POST', body: formData });
-        setUploading(false);
-        router.refresh();
+
+        try {
+            const res = await fetch('/api/files/upload', { method: 'POST', body: formData });
+            const data = await res.json();
+
+            if (!res.ok) {
+                setUploadMsg({ type: 'error', text: data.error || 'Upload failed. Please try again.' });
+                setUploading(false);
+                return;
+            }
+
+            // Optimistic: add the file to local state immediately
+            setFiles((prev) => [{
+                id: data.file.id,
+                original_name: data.file.originalName,
+                mime_type: file.type || null,
+                size_bytes: file.size,
+                profiles: null,
+                created_at: new Date().toISOString(),
+                google_drive_web_view_link: data.file.webViewLink,
+            }, ...prev]);
+
+            setUploadMsg({ type: 'success', text: `"${file.name}" uploaded successfully.` });
+
+            // Also refresh SSR data for consistency
+            router.refresh();
+        } catch {
+            setUploadMsg({ type: 'error', text: 'Network error. Please check your connection and try again.' });
+        } finally {
+            setUploading(false);
+            // Reset file input so same file can be re-selected
+            if (fileInputRef.current) fileInputRef.current.value = '';
+        }
     }
 
     async function handleOpen(fileId: string) {
@@ -31,6 +65,7 @@ export default function FilesListClient({ files, workspaceId }: { files: any[]; 
     async function handleDelete(fileId: string) {
         if (!confirm('Delete this file?')) return;
         await fetch(`/api/files/${fileId}`, { method: 'DELETE' });
+        setFiles((prev) => prev.filter((f) => f.id !== fileId));
         router.refresh();
     }
 
@@ -45,6 +80,24 @@ export default function FilesListClient({ files, workspaceId }: { files: any[]; 
                     </button>
                 </div>
             </div>
+
+            {uploadMsg && (
+                <div style={{
+                    padding: 'var(--space-sm) var(--space-md)',
+                    marginBottom: 'var(--space-md)',
+                    borderRadius: 'var(--radius-md)',
+                    fontSize: 'var(--font-sm)',
+                    background: uploadMsg.type === 'success' ? 'rgba(29,233,182,0.1)' : 'rgba(255,82,82,0.1)',
+                    border: `1px solid ${uploadMsg.type === 'success' ? 'rgba(29,233,182,0.2)' : 'rgba(255,82,82,0.2)'}`,
+                    color: uploadMsg.type === 'success' ? 'var(--status-success)' : 'var(--status-error)',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                }}>
+                    <span>{uploadMsg.text}</span>
+                    <button onClick={() => setUploadMsg(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', fontSize: 'var(--font-lg)' }}>×</button>
+                </div>
+            )}
 
             {files.length === 0 ? (
                 <div className="empty-state">

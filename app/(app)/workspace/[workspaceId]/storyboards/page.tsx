@@ -3,6 +3,8 @@ import { requireWorkspaceMembership } from '@/lib/permissions';
 import { createClient } from '@/lib/supabase/server';
 import StoryboardListClient from '@/components/storyboards/StoryboardListClient';
 
+export const dynamic = 'force-dynamic';
+
 interface PageProps {
     params: Promise<{ workspaceId: string }>;
 }

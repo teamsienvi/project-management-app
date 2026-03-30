@@ -46,6 +46,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     const userMenuRef = useRef<HTMLDivElement>(null);
 
     const currentWorkspaceId = pathname.match(/\/workspace\/([^/]+)/)?.[1];
+    const currentWorkspace = workspaces.find(ws => ws.workspace_id === currentWorkspaceId);
 
     const loadData = useCallback(async () => {
         const { data: { user } } = await supabase.auth.getUser();
@@ -94,28 +95,27 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         );
     };
 
-    const navItems = [
-        { label: 'Dashboard', href: '/dashboard', icon: '◫' },
-        ...(currentWorkspaceId
-            ? [
-                { label: 'Overview', href: `/workspace/${currentWorkspaceId}`, icon: '⬡' },
-                { label: 'Tasks', href: `/workspace/${currentWorkspaceId}/tasks`, icon: '☑' },
-                { label: 'Storyboards', href: `/workspace/${currentWorkspaceId}/storyboards`, icon: '⊞' },
-                { label: 'Files', href: `/workspace/${currentWorkspaceId}/files`, icon: '⧉' },
-                { label: 'Members', href: `/workspace/${currentWorkspaceId}/members`, icon: '⊕' },
-            ]
-            : []),
-    ];
-
     const getInitials = (name: string | null) => {
         if (!name) return '?';
         return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
     };
 
+    const navItems = [
+        { label: 'Home', href: currentWorkspaceId ? `/workspace/${currentWorkspaceId}` : '/dashboard', icon: '⌂' },
+        ...(currentWorkspaceId
+            ? [
+                { label: 'Tasks', href: `/workspace/${currentWorkspaceId}/tasks`, icon: '☑' },
+                { label: 'Storyboards', href: `/workspace/${currentWorkspaceId}/storyboards`, icon: '▦' },
+                { label: 'Files', href: `/workspace/${currentWorkspaceId}/files`, icon: '◫' },
+                { label: 'Members', href: `/workspace/${currentWorkspaceId}/members`, icon: '⊕' },
+            ]
+            : []),
+    ];
+
     return (
         <div className="app-shell">
             {/* Sidebar */}
-            <aside className={`sidebar glass-panel ${sidebarCollapsed ? 'collapsed' : ''}`}>
+            <aside className={`sidebar ${sidebarCollapsed ? 'collapsed' : ''}`}>
                 <div className="sidebar-header">
                     <div className="sidebar-brand gradient-text">⬡ IWPM</div>
                     <button
@@ -137,7 +137,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                                 className={`workspace-item ${currentWorkspaceId === ws.workspace_id ? 'active' : ''}`}
                                 onClick={() => router.push(`/workspace/${ws.workspace_id}`)}
                             >
-                                <span className="workspace-icon">⬡</span>
+                                <span className="workspace-icon">{ws.workspaces.name[0]?.toUpperCase() || '?'}</span>
                                 {!sidebarCollapsed && <span className="workspace-name">{ws.workspaces.name}</span>}
                             </button>
                         ))}
@@ -189,18 +189,24 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             {/* Main content area */}
             <div className="app-main">
                 {/* Top bar */}
-                <header className="topbar glass-panel">
+                <header className="topbar">
                     <div className="topbar-left">
-                        <div className="topbar-search">
-                            <span className="search-icon">⌕</span>
-                            <input
-                                type="text"
-                                placeholder="Search tasks, files, members..."
-                                className="search-input"
-                                aria-label="Search"
-                            />
-                            <kbd className="search-kbd">⌘K</kbd>
-                        </div>
+                        {currentWorkspace ? (
+                            <div style={{ fontSize: 'var(--font-md)', fontWeight: 600, color: 'var(--text-primary)' }}>
+                                {currentWorkspace.workspaces.name}
+                            </div>
+                        ) : (
+                            <div className="topbar-search">
+                                <span className="search-icon">⌕</span>
+                                <input
+                                    type="text"
+                                    placeholder="Search..."
+                                    className="search-input"
+                                    aria-label="Search"
+                                />
+                                <kbd className="search-kbd">⌘K</kbd>
+                            </div>
+                        )}
                     </div>
 
                     <div className="topbar-right">

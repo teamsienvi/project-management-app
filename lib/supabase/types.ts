@@ -50,6 +50,9 @@ export interface Database {
                     google_drive_storyboards_folder_id: string | null;
                     google_drive_general_files_folder_id: string | null;
                     google_drive_task_attachments_folder_id: string | null;
+                    join_code: string;
+                    join_code_enabled: boolean;
+                    join_code_last_rotated_at: string | null;
                     created_at: string;
                     updated_at: string;
                 };
@@ -62,6 +65,9 @@ export interface Database {
                     google_drive_storyboards_folder_id?: string | null;
                     google_drive_general_files_folder_id?: string | null;
                     google_drive_task_attachments_folder_id?: string | null;
+                    join_code?: string;
+                    join_code_enabled?: boolean;
+                    join_code_last_rotated_at?: string | null;
                     created_at?: string;
                     updated_at?: string;
                 };
@@ -74,6 +80,9 @@ export interface Database {
                     google_drive_storyboards_folder_id?: string | null;
                     google_drive_general_files_folder_id?: string | null;
                     google_drive_task_attachments_folder_id?: string | null;
+                    join_code?: string;
+                    join_code_enabled?: boolean;
+                    join_code_last_rotated_at?: string | null;
                     created_at?: string;
                     updated_at?: string;
                 };
@@ -295,6 +304,48 @@ export interface Database {
                     google_drive_folder_id?: string | null;
                     created_by?: string;
                     created_at?: string;
+                };
+                Relationships: [];
+            };
+            storyboard_notes: {
+                Row: {
+                    id: string;
+                    workspace_id: string;
+                    storyboard_folder_id: string | null;
+                    title: string;
+                    content: string;
+                    format: string;
+                    created_by: string;
+                    updated_by: string | null;
+                    created_at: string;
+                    updated_at: string;
+                    deleted_at: string | null;
+                };
+                Insert: {
+                    id?: string;
+                    workspace_id: string;
+                    storyboard_folder_id?: string | null;
+                    title?: string;
+                    content?: string;
+                    format?: string;
+                    created_by: string;
+                    updated_by?: string | null;
+                    created_at?: string;
+                    updated_at?: string;
+                    deleted_at?: string | null;
+                };
+                Update: {
+                    id?: string;
+                    workspace_id?: string;
+                    storyboard_folder_id?: string | null;
+                    title?: string;
+                    content?: string;
+                    format?: string;
+                    created_by?: string;
+                    updated_by?: string | null;
+                    created_at?: string;
+                    updated_at?: string;
+                    deleted_at?: string | null;
                 };
                 Relationships: [];
             };

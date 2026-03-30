@@ -6,15 +6,16 @@
     padding: var(--space-lg);
     position: relative;
     overflow: hidden;
+    background: var(--bg-page);
 }
 
 .auth-bg-effect {
     position: absolute;
     inset: 0;
     background:
-        radial-gradient(ellipse at 20% 50%, rgba(0, 229, 255, 0.06) 0%, transparent 50%),
-        radial-gradient(ellipse at 80% 20%, rgba(224, 64, 251, 0.06) 0%, transparent 50%),
-        radial-gradient(ellipse at 50% 80%, rgba(41, 121, 255, 0.04) 0%, transparent 50%);
+        radial-gradient(ellipse at 20% 50%, rgba(29, 114, 184, 0.04) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 20%, rgba(124, 92, 191, 0.04) 0%, transparent 50%),
+        radial-gradient(ellipse at 50% 80%, rgba(26, 138, 92, 0.03) 0%, transparent 50%);
     pointer-events: none;
 }
 
@@ -29,14 +30,13 @@
     max-width: 420px;
 }
 
-.auth-brand {
-    text-align: center;
-}
+.auth-brand { text-align: center; }
 
 .auth-brand h1 {
     font-size: var(--font-4xl);
     font-weight: 800;
     letter-spacing: -0.03em;
+    color: var(--text-primary);
 }
 
 .auth-subtitle {
@@ -48,12 +48,17 @@
 .auth-card {
     width: 100%;
     padding: var(--space-xl);
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg);
 }
 
 .auth-card h2 {
     font-size: var(--font-2xl);
     font-weight: 700;
     margin-bottom: var(--space-lg);
+    color: var(--text-primary);
 }
 
 .auth-form {
@@ -78,8 +83,8 @@
 
 .auth-error {
     padding: var(--space-sm) var(--space-md);
-    background: rgba(255, 82, 82, 0.1);
-    border: 1px solid rgba(255, 82, 82, 0.2);
+    background: #fde8e8;
+    border: 1px solid #f5c6c6;
     border-radius: var(--radius-md);
     color: var(--status-error);
     font-size: var(--font-sm);
