@@ -1,7 +1,13 @@
 'use client';
 
-import { useState, useEffect, useCallback, type FormEvent } from 'react';
+import { useState, useEffect, useCallback, useMemo, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
+import {
+    cleanFolderName,
+    getFolderSortOrder,
+    getFolderIcon,
+    getFolderAccentColor,
+} from '@/lib/storyboard-helpers';
 
 interface Folder {
     id: string;
@@ -109,12 +115,21 @@ export default function StoryboardListClient({
         }
     }
 
-    const syncedFolders = folders.filter(f => f.description === 'Synced from Google Drive');
+    // Split into synced and app-created, sort synced by numeric prefix
+    const syncedFolders = useMemo(() =>
+        folders
+            .filter(f => f.description === 'Synced from Google Drive')
+            .sort((a, b) => getFolderSortOrder(a.name) - getFolderSortOrder(b.name)),
+        [folders]
+    );
     const appFolders = folders.filter(f => f.description !== 'Synced from Google Drive');
 
     function renderFolderCard(folder: Folder, isSynced = false) {
         const isConfirming = confirmDeleteId === folder.id;
         const isDeleting = deletingId === folder.id;
+        const displayName = isSynced ? cleanFolderName(folder.name) : folder.name;
+        const icon = isSynced ? getFolderIcon(folder.name) : '📁';
+        const accentColor = isSynced ? getFolderAccentColor(folder.name) : 'var(--accent-blue)';
 
         return (
             <div
@@ -124,10 +139,15 @@ export default function StoryboardListClient({
                     textAlign: 'left', width: '100%', fontFamily: 'var(--font-family)',
                     border: '1px solid var(--border-default)',
                     position: 'relative', overflow: 'hidden',
-                    ...(isSynced ? { background: '#f8f6f0' } : {}),
                     ...(isDeleting ? { opacity: 0.5, pointerEvents: 'none' as const } : {}),
                 }}
             >
+                {/* Color accent strip */}
+                <div style={{
+                    position: 'absolute', top: 0, left: 0, right: 0, height: 3,
+                    background: accentColor, opacity: 0.8,
+                }} />
+
                 {/* Confirm delete overlay */}
                 {isConfirming && (
                     <div style={{
@@ -137,7 +157,7 @@ export default function StoryboardListClient({
                         gap: '8px', padding: '12px',
                     }}>
                         <p style={{ fontSize: 'var(--font-sm)', fontWeight: 500, textAlign: 'center' }}>
-                            Delete &quot;{folder.name}&quot;?
+                            Delete &quot;{displayName}&quot;?
                         </p>
                         <div style={{ display: 'flex', gap: '8px' }}>
                             <button
@@ -168,7 +188,7 @@ export default function StoryboardListClient({
                     }}
                     title="Delete folder"
                     style={{
-                        position: 'absolute', top: 8, right: 8, zIndex: 5,
+                        position: 'absolute', top: 12, right: 8, zIndex: 5,
                         background: 'rgba(255,255,255,0.85)', border: '1px solid #ddd',
                         borderRadius: '6px', cursor: 'pointer', fontSize: '12px',
                         padding: '3px 7px', lineHeight: 1, color: '#999',
@@ -185,13 +205,29 @@ export default function StoryboardListClient({
                     onClick={() => {
                         if (!isConfirming) router.push(`/workspace/${workspaceId}/storyboards/${folder.id}`);
                     }}
-                    style={{ padding: 'var(--space-lg)', cursor: isConfirming ? 'default' : 'pointer' }}
+                    style={{ padding: 'var(--space-lg)', paddingTop: 'calc(var(--space-lg) + 4px)', cursor: isConfirming ? 'default' : 'pointer' }}
                 >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-sm)', marginBottom: 'var(--space-sm)' }}>
-                        <span style={{ fontSize: '24px' }}>📁</span>
-                        {isSynced && <span className="badge badge-success" style={{ fontSize: '9px' }}>DRIVE</span>}
+                    <div style={{
+                        display: 'flex', alignItems: 'center', gap: 'var(--space-sm)',
+                        marginBottom: 'var(--space-sm)',
+                    }}>
+                        <span style={{
+                            fontSize: '28px', width: 44, height: 44, display: 'flex',
+                            alignItems: 'center', justifyContent: 'center',
+                            background: `${accentColor}12`, borderRadius: 10,
+                        }}>{icon}</span>
+                        {isSynced && (
+                            <span style={{
+                                fontSize: '9px', fontWeight: 600, color: 'hsl(145, 55%, 40%)',
+                                background: 'hsl(145, 50%, 94%)', padding: '2px 7px',
+                                borderRadius: 4, letterSpacing: '0.5px',
+                            }}>DRIVE</span>
+                        )}
                     </div>
-                    <h3 style={{ fontSize: 'var(--font-lg)', fontWeight: 600, color: 'var(--text-primary)', marginBottom: 'var(--space-xs)' }}>{folder.name}</h3>
+                    <h3 style={{
+                        fontSize: 'var(--font-lg)', fontWeight: 600,
+                        color: 'var(--text-primary)', marginBottom: 'var(--space-xs)',
+                    }}>{displayName}</h3>
                     {folder.description && folder.description !== 'Synced from Google Drive' && (
                         <p style={{ fontSize: 'var(--font-sm)', color: 'var(--text-tertiary)' }}>{folder.description}</p>
                     )}
@@ -234,9 +270,26 @@ export default function StoryboardListClient({
 
                     {syncedFolders.length > 0 && (
                         <>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-sm)', marginBottom: 'var(--space-md)' }}>
-                                <span style={{ fontSize: 'var(--font-sm)', fontWeight: 600, color: 'var(--text-tertiary)' }}>📂 Synced from Google Drive</span>
+                            <div style={{
+                                display: 'flex', alignItems: 'center', gap: 'var(--space-sm)',
+                                marginBottom: 'var(--space-md)',
+                            }}>
+                                <span style={{
+                                    fontSize: 'var(--font-sm)', fontWeight: 600,
+                                    color: 'var(--text-tertiary)',
+                                    display: 'flex', alignItems: 'center', gap: 6,
+                                }}>
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                                    Synced from Google Drive
+                                </span>
                                 <div style={{ flex: 1, height: 1, background: 'var(--border-default)' }} />
+                                <span style={{
+                                    fontSize: 'var(--font-xs)', color: 'var(--text-muted)',
+                                    background: 'var(--bg-secondary)', padding: '2px 8px',
+                                    borderRadius: 10,
+                                }}>
+                                    {syncedFolders.length} folder{syncedFolders.length !== 1 ? 's' : ''}
+                                </span>
                             </div>
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 'var(--space-md)', marginBottom: 'var(--space-xl)' }}>
                                 {syncedFolders.map((folder) => renderFolderCard(folder, true))}

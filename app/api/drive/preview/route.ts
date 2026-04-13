@@ -4,6 +4,7 @@ import { apiSuccess, apiError } from '@/lib/utils';
 /**
  * GET /api/drive/preview?fileId=DRIVE_FILE_ID&mimeType=...&name=...
  * Returns preview info for a raw Drive file (not tracked in DB).
+ * Uses our proxy endpoint so users don't need Google auth to view files.
  */
 export async function GET(request: NextRequest) {
     try {
@@ -14,29 +15,29 @@ export async function GET(request: NextRequest) {
 
         if (!driveFileId) return apiError('fileId is required', 400);
 
-        let previewUrl = '';
+        // Use our proxy endpoint to serve content without requiring Google auth
+        const proxyUrl = `/api/drive/proxy?fileId=${driveFileId}`;
+
+        let previewUrl = proxyUrl;
         let previewType: 'iframe' | 'image' | 'video' | 'audio' | 'pdf' | 'external' = 'iframe';
 
-        if (mimeType.includes('google-apps.document')) {
-            previewUrl = `https://docs.google.com/document/d/${driveFileId}/preview`;
-        } else if (mimeType.includes('google-apps.spreadsheet')) {
-            previewUrl = `https://docs.google.com/spreadsheets/d/${driveFileId}/preview`;
-        } else if (mimeType.includes('google-apps.presentation')) {
-            previewUrl = `https://docs.google.com/presentation/d/${driveFileId}/preview`;
+        if (mimeType.includes('google-apps.document') ||
+            mimeType.includes('google-apps.spreadsheet') ||
+            mimeType.includes('google-apps.presentation')) {
+            // Google Workspace files — proxy exports as PDF
+            previewType = 'pdf';
         } else if (mimeType.includes('pdf')) {
-            previewUrl = `https://drive.google.com/file/d/${driveFileId}/preview`;
             previewType = 'pdf';
         } else if (mimeType.startsWith('image/')) {
-            previewUrl = `https://drive.google.com/file/d/${driveFileId}/preview`;
             previewType = 'image';
         } else if (mimeType.startsWith('video/')) {
-            previewUrl = `https://drive.google.com/file/d/${driveFileId}/preview`;
             previewType = 'video';
         } else if (mimeType.startsWith('audio/')) {
-            previewUrl = `https://drive.google.com/file/d/${driveFileId}/preview`;
             previewType = 'audio';
-        } else {
-            previewUrl = `https://drive.google.com/file/d/${driveFileId}/preview`;
+        } else if (mimeType.includes('text/') || mimeType.includes('markdown') ||
+                   name.endsWith('.md') || name.endsWith('.txt') ||
+                   name.endsWith('.json') || name.endsWith('.csv')) {
+            previewType = 'iframe';
         }
 
         return apiSuccess({

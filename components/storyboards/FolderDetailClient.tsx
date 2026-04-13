@@ -1,7 +1,13 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
+import {
+    cleanFolderName,
+    getFolderSortOrder,
+    getFolderIcon,
+    getFolderAccentColor,
+} from '@/lib/storyboard-helpers';
 
 /* ─── Types ─── */
 interface DriveFile {
@@ -45,6 +51,7 @@ function getShortType(m: string): string {
 interface FolderDetailClientProps {
     folder: any; subFolders: any[]; files: any[];
     driveFiles?: DriveFile[]; notes?: Note[]; workspaceId: string;
+    breadcrumbs?: Array<{ id: string; name: string }>;
 }
 
 type ViewMode = 'list' | 'grid';
@@ -53,6 +60,7 @@ type ModalType = 'none' | 'newFolder' | 'newNote' | 'editNote';
 export default function FolderDetailClient({
     folder, subFolders: initialSubFolders, files: initialFiles,
     driveFiles = [], notes: initialNotes = [], workspaceId,
+    breadcrumbs = [],
 }: FolderDetailClientProps) {
     const router = useRouter();
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -95,6 +103,12 @@ export default function FolderDetailClient({
         setViewMode(mode);
         localStorage.setItem('storyboard-view-mode', mode);
     }
+
+    // Cleaned folder name
+    const displayFolderName = cleanFolderName(folder.name);
+    const folderIcon = getFolderIcon(folder.name);
+    const folderColor = getFolderAccentColor(folder.name);
+    const isSyncedFolder = folder.description === 'Synced from Google Drive';
 
     /* ─── File Upload ─── */
     async function handleUpload(file: File) {
@@ -244,7 +258,13 @@ export default function FolderDetailClient({
         } catch (e) { console.error(e); } finally { setDeletingId(null); }
     }
 
-    const syncedSubFolders = subFolders.filter((f: any) => f.description === 'Synced from Google Drive');
+    // Sort synced subfolders by numeric prefix
+    const syncedSubFolders = useMemo(() =>
+        subFolders
+            .filter((f: any) => f.description === 'Synced from Google Drive')
+            .sort((a: any, b: any) => getFolderSortOrder(a.name) - getFolderSortOrder(b.name)),
+        [subFolders]
+    );
     const appSubFolders = subFolders.filter((f: any) => f.description !== 'Synced from Google Drive');
     const allFiles: Array<{ type: 'db' | 'drive'; data: any }> = [
         ...files.map((f: any) => ({ type: 'db' as const, data: f })),
@@ -255,27 +275,46 @@ export default function FolderDetailClient({
     function renderSubFolderCard(sf: any, isSynced = false) {
         const isConfirming = confirmDeleteId === sf.id;
         const isDeleting = deletingId === sf.id;
+        const sfDisplayName = isSynced ? cleanFolderName(sf.name) : sf.name;
+        const sfIcon = isSynced ? getFolderIcon(sf.name) : '📁';
+        const sfColor = isSynced ? getFolderAccentColor(sf.name) : 'var(--accent-blue)';
+
         return (
-            <div key={sf.id} className="glass-card glow-hover" style={{ textAlign: 'left', width: '100%', border: '1px solid var(--border-default)', position: 'relative', overflow: 'hidden', ...(isSynced ? { background: '#f8f6f0' } : {}), ...(isDeleting ? { opacity: 0.5, pointerEvents: 'none' as const } : {}) }}>
+            <div key={sf.id} className="glass-card glow-hover" style={{
+                textAlign: 'left', width: '100%',
+                border: '1px solid var(--border-default)',
+                position: 'relative', overflow: 'hidden',
+                ...(isDeleting ? { opacity: 0.5, pointerEvents: 'none' as const } : {}),
+            }}>
+                {/* Color accent strip */}
+                <div style={{
+                    position: 'absolute', top: 0, left: 0, right: 0, height: 3,
+                    background: sfColor, opacity: 0.7,
+                }} />
+
                 {isConfirming && (
                     <div style={{ position: 'absolute', inset: 0, zIndex: 10, background: 'rgba(255,255,255,0.95)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 12 }}>
-                        <p style={{ fontSize: 13, fontWeight: 500 }}>Delete &quot;{sf.name}&quot;?</p>
+                        <p style={{ fontSize: 13, fontWeight: 500 }}>Delete &quot;{sfDisplayName}&quot;?</p>
                         <div style={{ display: 'flex', gap: 8 }}>
                             <button style={{ background: '#e53e3e', color: 'white', border: 'none', padding: '4px 12px', borderRadius: 6, cursor: 'pointer', fontSize: 13 }} onClick={() => doDeleteSubFolder(sf.id)}>Delete</button>
                             <button style={{ background: '#eee', border: '1px solid #ccc', padding: '4px 12px', borderRadius: 6, cursor: 'pointer', fontSize: 13 }} onClick={() => setConfirmDeleteId(null)}>Cancel</button>
                         </div>
                     </div>
                 )}
-                <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setConfirmDeleteId(sf.id); }} title="Delete" style={{ position: 'absolute', top: 6, right: 6, zIndex: 5, background: 'rgba(255,255,255,0.85)', border: '1px solid #ddd', borderRadius: 6, cursor: 'pointer', fontSize: 11, padding: '2px 6px', lineHeight: 1, color: '#999', transition: 'all 0.15s' }}
+                <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setConfirmDeleteId(sf.id); }} title="Delete" style={{ position: 'absolute', top: 10, right: 6, zIndex: 5, background: 'rgba(255,255,255,0.85)', border: '1px solid #ddd', borderRadius: 6, cursor: 'pointer', fontSize: 11, padding: '2px 6px', lineHeight: 1, color: '#999', transition: 'all 0.15s' }}
                     onMouseEnter={(e) => { e.currentTarget.style.background = '#fee2e2'; e.currentTarget.style.borderColor = '#e53e3e'; e.currentTarget.style.color = '#e53e3e'; }}
                     onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.85)'; e.currentTarget.style.borderColor = '#ddd'; e.currentTarget.style.color = '#999'; }}
                 >✕</button>
-                <div onClick={() => { if (!isConfirming) router.push(`/workspace/${workspaceId}/storyboards/${sf.id}`); }} style={{ padding: 'var(--space-md)', cursor: isConfirming ? 'default' : 'pointer' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                        <span style={{ fontSize: 20 }}>📁</span>
-                        {isSynced && <span className="badge badge-success" style={{ fontSize: 9 }}>DRIVE</span>}
+                <div onClick={() => { if (!isConfirming) router.push(`/workspace/${workspaceId}/storyboards/${sf.id}`); }} style={{ padding: 'var(--space-md)', paddingTop: 'calc(var(--space-md) + 4px)', cursor: isConfirming ? 'default' : 'pointer' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                        <span style={{
+                            fontSize: 22, width: 36, height: 36, display: 'flex',
+                            alignItems: 'center', justifyContent: 'center',
+                            background: `${sfColor}12`, borderRadius: 8,
+                        }}>{sfIcon}</span>
+                        {isSynced && <span style={{ fontSize: 8, fontWeight: 600, color: 'hsl(145, 55%, 40%)', background: 'hsl(145, 50%, 94%)', padding: '1px 6px', borderRadius: 3, letterSpacing: '0.5px' }}>DRIVE</span>}
                     </div>
-                    <div style={{ fontWeight: 500, color: 'var(--text-primary)' }}>{sf.name}</div>
+                    <div style={{ fontWeight: 500, color: 'var(--text-primary)', fontSize: 'var(--font-sm)' }}>{sfDisplayName}</div>
                 </div>
             </div>
         );
@@ -382,14 +421,67 @@ export default function FolderDetailClient({
     /* ─── Main render ─── */
     return (
         <div>
-            <button className="btn btn-ghost" onClick={() => router.push(`/workspace/${workspaceId}/storyboards`)} style={{ marginBottom: 'var(--space-md)' }}>← Back to Storyboards</button>
+            {/* Breadcrumb Navigation */}
+            <nav style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                marginBottom: 'var(--space-md)', flexWrap: 'wrap',
+            }}>
+                <button
+                    className="btn btn-ghost"
+                    onClick={() => router.push(`/workspace/${workspaceId}/storyboards`)}
+                    style={{ fontSize: 'var(--font-sm)', padding: '4px 8px' }}
+                >
+                    Storyboards
+                </button>
+                {breadcrumbs.map((crumb) => (
+                    <span key={crumb.id} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>›</span>
+                        <button
+                            className="btn btn-ghost"
+                            onClick={() => router.push(`/workspace/${workspaceId}/storyboards/${crumb.id}`)}
+                            style={{ fontSize: 'var(--font-sm)', padding: '4px 8px' }}
+                        >
+                            {cleanFolderName(crumb.name)}
+                        </button>
+                    </span>
+                ))}
+                <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>›</span>
+                <span style={{
+                    fontSize: 'var(--font-sm)', fontWeight: 600,
+                    color: 'var(--text-primary)', padding: '4px 8px',
+                }}>
+                    {displayFolderName}
+                </span>
+            </nav>
 
             {/* Header */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-lg)', flexWrap: 'wrap', gap: 8 }}>
-                <div>
-                    <h1 style={{ fontSize: 'var(--font-2xl)', fontWeight: 700 }}>{folder.name}</h1>
-                    {folder.description && folder.description !== 'Synced from Google Drive' && <p style={{ color: 'var(--text-tertiary)', marginTop: 'var(--space-xs)' }}>{folder.description}</p>}
-                    {folder.description === 'Synced from Google Drive' && <span className="badge badge-success" style={{ marginTop: 'var(--space-xs)' }}>Synced from Google Drive</span>}
+            <div style={{
+                display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
+                marginBottom: 'var(--space-lg)', flexWrap: 'wrap', gap: 12,
+            }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-md)' }}>
+                    <span style={{
+                        fontSize: 36, width: 56, height: 56, display: 'flex',
+                        alignItems: 'center', justifyContent: 'center',
+                        background: `${folderColor}12`, borderRadius: 14,
+                    }}>{folderIcon}</span>
+                    <div>
+                        <h1 style={{ fontSize: 'var(--font-2xl)', fontWeight: 700, lineHeight: 1.2 }}>{displayFolderName}</h1>
+                        {folder.description && folder.description !== 'Synced from Google Drive' && (
+                            <p style={{ color: 'var(--text-tertiary)', marginTop: 2, fontSize: 'var(--font-sm)' }}>{folder.description}</p>
+                        )}
+                        {isSyncedFolder && (
+                            <span style={{
+                                display: 'inline-flex', alignItems: 'center', gap: 4,
+                                fontSize: 11, fontWeight: 500, color: 'hsl(145, 55%, 40%)',
+                                background: 'hsl(145, 50%, 94%)', padding: '2px 8px',
+                                borderRadius: 4, marginTop: 4,
+                            }}>
+                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                                Synced from Google Drive
+                            </span>
+                        )}
+                    </div>
                 </div>
                 <div style={{ display: 'flex', gap: 'var(--space-sm)', alignItems: 'center', flexWrap: 'wrap' }}>
                     <button className="btn btn-secondary" onClick={() => { setNewFolderName(''); setModal('newFolder'); }} style={{ fontSize: 13 }}>📁 New Folder</button>
@@ -402,7 +494,12 @@ export default function FolderDetailClient({
             {/* Subfolders */}
             {(appSubFolders.length > 0 || syncedSubFolders.length > 0) && (
                 <div style={{ marginBottom: 'var(--space-xl)' }}>
-                    <h2 style={{ fontSize: 'var(--font-lg)', fontWeight: 600, marginBottom: 'var(--space-md)' }}>Folders</h2>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-sm)', marginBottom: 'var(--space-md)' }}>
+                        <h2 style={{ fontSize: 'var(--font-lg)', fontWeight: 600 }}>Folders</h2>
+                        <span style={{ fontSize: 'var(--font-xs)', color: 'var(--text-muted)', background: 'var(--bg-secondary)', padding: '2px 8px', borderRadius: 10 }}>
+                            {appSubFolders.length + syncedSubFolders.length}
+                        </span>
+                    </div>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 'var(--space-md)' }}>
                         {appSubFolders.map((sf: any) => renderSubFolderCard(sf, false))}
                         {syncedSubFolders.map((sf: any) => renderSubFolderCard(sf, true))}
@@ -413,7 +510,10 @@ export default function FolderDetailClient({
             {/* Notes */}
             {notes.length > 0 && (
                 <div style={{ marginBottom: 'var(--space-xl)' }}>
-                    <h2 style={{ fontSize: 'var(--font-lg)', fontWeight: 600, marginBottom: 'var(--space-md)' }}>Notes</h2>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-sm)', marginBottom: 'var(--space-md)' }}>
+                        <h2 style={{ fontSize: 'var(--font-lg)', fontWeight: 600 }}>Notes</h2>
+                        <span style={{ fontSize: 'var(--font-xs)', color: 'var(--text-muted)', background: 'var(--bg-secondary)', padding: '2px 8px', borderRadius: 10 }}>{notes.length}</span>
+                    </div>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 'var(--space-md)' }}>
                         {notes.map(note => renderNoteCard(note))}
                     </div>
@@ -422,7 +522,12 @@ export default function FolderDetailClient({
 
             {/* Files */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-md)' }}>
-                <h2 style={{ fontSize: 'var(--font-lg)', fontWeight: 600 }}>Files</h2>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-sm)' }}>
+                    <h2 style={{ fontSize: 'var(--font-lg)', fontWeight: 600 }}>Files</h2>
+                    {allFiles.length > 0 && (
+                        <span style={{ fontSize: 'var(--font-xs)', color: 'var(--text-muted)', background: 'var(--bg-secondary)', padding: '2px 8px', borderRadius: 10 }}>{allFiles.length}</span>
+                    )}
+                </div>
                 {allFiles.length > 0 && (
                     <div style={{ display: 'flex', gap: 2, background: 'var(--bg-secondary)', borderRadius: 8, padding: 2 }}>
                         <button onClick={() => changeViewMode('grid')} title="Grid view" style={{ padding: '5px 10px', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 14, lineHeight: 1, transition: 'all 0.15s', background: viewMode === 'grid' ? 'white' : 'transparent', boxShadow: viewMode === 'grid' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none', color: viewMode === 'grid' ? 'var(--text-primary)' : 'var(--text-muted)' }}>▦</button>
@@ -571,7 +676,25 @@ export default function FolderDetailClient({
                                 <button onClick={() => setPreview(null)} style={{ background: 'none', border: '1px solid #ddd', borderRadius: 8, cursor: 'pointer', fontSize: 16, padding: '4px 10px', color: '#666' }}>✕</button>
                             </div>
                         </div>
-                        <div style={{ flex: 1, overflow: 'hidden' }}><iframe src={preview.previewUrl} style={{ width: '100%', height: '100%', border: 'none' }} allow="autoplay" title={preview.name} /></div>
+                        <div style={{ flex: 1, overflow: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f5f5f5' }}>
+                            {preview.previewType === 'image' ? (
+                                /* eslint-disable-next-line @next/next/no-img-element */
+                                <img src={preview.previewUrl} alt={preview.name} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
+                            ) : preview.previewType === 'video' ? (
+                                <video src={preview.previewUrl} controls autoPlay style={{ maxWidth: '100%', maxHeight: '100%' }} />
+                            ) : preview.previewType === 'audio' ? (
+                                <div style={{ padding: 40, textAlign: 'center' }}>
+                                    <div style={{ fontSize: 64, marginBottom: 20 }}>🎵</div>
+                                    <audio src={preview.previewUrl} controls autoPlay style={{ width: '100%', maxWidth: 500 }} />
+                                </div>
+                            ) : preview.previewType === 'pdf' ? (
+                                <object data={preview.previewUrl} type="application/pdf" style={{ width: '100%', height: '100%' }}>
+                                    <iframe src={preview.previewUrl} style={{ width: '100%', height: '100%', border: 'none' }} title={preview.name} />
+                                </object>
+                            ) : (
+                                <iframe src={preview.previewUrl} style={{ width: '100%', height: '100%', border: 'none' }} allow="autoplay" title={preview.name} />
+                            )}
+                        </div>
                     </div>
                 </div>
             )}

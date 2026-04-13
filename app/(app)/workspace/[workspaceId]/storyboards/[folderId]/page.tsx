@@ -26,6 +26,23 @@ export default async function FolderDetailPage({ params }: PageProps) {
     const files = filesRes.data || [];
     const notes = notesRes.data || [];
 
+    // Build breadcrumb chain by walking up parents
+    const breadcrumbs: Array<{ id: string; name: string }> = [];
+    let currentParentId = folder.parent_folder_id;
+    const maxDepth = 10; // Safety limit
+    let depth = 0;
+    while (currentParentId && depth < maxDepth) {
+        const { data: parent } = await adminSupabase
+            .from('storyboard_folders')
+            .select('id, name, parent_folder_id')
+            .eq('id', currentParentId)
+            .single();
+        if (!parent) break;
+        breadcrumbs.unshift({ id: parent.id, name: parent.name });
+        currentParentId = parent.parent_folder_id;
+        depth++;
+    }
+
     // Sync nested Drive contents if this folder has a Drive ID
     let driveOnlyFiles: Array<{ id: string; name: string; mimeType: string; webViewLink: string | null; createdTime: string | null }> = [];
 
@@ -86,7 +103,7 @@ export default async function FolderDetailPage({ params }: PageProps) {
             driveFiles={driveOnlyFiles}
             notes={notes}
             workspaceId={workspaceId}
+            breadcrumbs={breadcrumbs}
         />
     );
 }
-
