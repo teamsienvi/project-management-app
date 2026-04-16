@@ -26,12 +26,13 @@ export async function PATCH(
         if (!currentTask) return apiError('Task not found', 404);
 
         const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
-        const { title, description, status, priority, dueDate, assigneeUserId } = parsed.data;
+        const { title, description, status, priority, dueDate, assigneeUserId, color } = parsed.data;
 
         if (title !== undefined) updates.title = title;
         if (description !== undefined) updates.description = description;
         if (status !== undefined) updates.status = status;
         if (priority !== undefined) updates.priority = priority;
+        if (color !== undefined) updates.color = color;
         if (dueDate !== undefined) updates.due_date = dueDate;
         if (assigneeUserId !== undefined) updates.assignee_user_id = assigneeUserId;
 
@@ -49,6 +50,7 @@ export async function PATCH(
         if (title !== undefined && title !== currentTask.title) changes.push('title');
         if (status !== undefined && status !== currentTask.status) changes.push('status');
         if (priority !== undefined && priority !== currentTask.priority) changes.push('priority');
+        if (color !== undefined && color !== (currentTask as any).color) changes.push('color');
         if (assigneeUserId !== undefined && assigneeUserId !== currentTask.assignee_user_id) changes.push('assignee');
         if (dueDate !== undefined) changes.push('due_date');
 

@@ -22,7 +22,7 @@ export async function POST(
         const parsed = createTaskSchema.safeParse(body);
         if (!parsed.success) return apiError(parsed.error.issues[0].message);
 
-        const { title, description, status, priority, dueDate, assigneeUserId } = parsed.data;
+        const { title, description, status, priority, dueDate, assigneeUserId, color } = parsed.data;
 
         const { data: task, error } = await supabase
             .from('tasks')
@@ -32,6 +32,7 @@ export async function POST(
                 description: description || null,
                 status: status || 'todo',
                 priority: priority || 'medium',
+                color: color || 'gray',
                 due_date: dueDate || null,
                 assignee_user_id: assigneeUserId || null,
                 created_by: user.id,

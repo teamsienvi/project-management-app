@@ -30,6 +30,7 @@ export const createTaskSchema = z.object({
     priority: z.enum(['low', 'medium', 'high', 'urgent']).default('medium'),
     dueDate: z.iso.datetime().optional(),
     assigneeUserId: z.uuid().optional(),
+    color: z.enum(['gray', 'red', 'orange', 'amber', 'green', 'blue', 'indigo', 'pink']).default('gray'),
 });
 
 export const updateTaskSchema = z.object({
@@ -39,6 +40,7 @@ export const updateTaskSchema = z.object({
     priority: z.enum(['low', 'medium', 'high', 'urgent']).optional(),
     dueDate: z.iso.datetime().nullable().optional(),
     assigneeUserId: z.uuid().nullable().optional(),
+    color: z.enum(['gray', 'red', 'orange', 'amber', 'green', 'blue', 'indigo', 'pink']).optional(),
 });
 
 /* ---- Notes ---- */

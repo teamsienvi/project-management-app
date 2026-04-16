@@ -8,6 +8,8 @@ import {
     getFolderIcon,
     getFolderAccentColor,
 } from '@/lib/storyboard-helpers';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 /* ─── Types ─── */
 interface DriveFile {
@@ -77,6 +79,19 @@ export default function FolderDetailClient({
     const [viewMode, setViewMode] = useState<ViewMode>('grid');
     const [preview, setPreview] = useState<PreviewData | null>(null);
     const [loadingPreview, setLoadingPreview] = useState(false);
+    const [markdownContent, setMarkdownContent] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (preview?.previewType === 'markdown' && preview.previewUrl) {
+            setMarkdownContent('Loading markdown...');
+            fetch(preview.previewUrl)
+                .then(res => res.text())
+                .then(text => setMarkdownContent(text))
+                .catch(() => setMarkdownContent('Failed to load markdown content.'));
+        } else {
+            setMarkdownContent(null);
+        }
+    }, [preview]);
 
     // Modals
     const [modal, setModal] = useState<ModalType>('none');
@@ -686,6 +701,10 @@ export default function FolderDetailClient({
                                 <div style={{ padding: 40, textAlign: 'center' }}>
                                     <div style={{ fontSize: 64, marginBottom: 20 }}>🎵</div>
                                     <audio src={preview.previewUrl} controls autoPlay style={{ width: '100%', maxWidth: 500 }} />
+                                </div>
+                            ) : preview.previewType === 'markdown' ? (
+                                <div className="markdown-preview" style={{ padding: '40px 60px', width: '100%', height: '100%', overflow: 'auto', background: 'white' }}>
+                                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{markdownContent || ''}</ReactMarkdown>
                                 </div>
                             ) : preview.previewType === 'pdf' ? (
                                 <object data={preview.previewUrl} type="application/pdf" style={{ width: '100%', height: '100%' }}>

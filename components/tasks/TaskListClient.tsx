@@ -8,6 +8,7 @@ interface Task {
     title: string;
     status: string;
     priority: string;
+    color: string;
     due_date: string | null;
     assignee_user_id: string | null;
     created_at: string;
@@ -27,6 +28,7 @@ interface TaskListClientProps {
 
 const STATUS_OPTIONS = ['todo', 'in_progress', 'review', 'done'] as const;
 const PRIORITY_OPTIONS = ['low', 'medium', 'high', 'urgent'] as const;
+const COLOR_OPTIONS = ['gray', 'red', 'orange', 'amber', 'green', 'blue', 'indigo', 'pink'] as const;
 const STATUS_LABELS: Record<string, string> = { todo: 'To Do', in_progress: 'In Progress', review: 'Review', done: 'Done' };
 
 export default function TaskListClient({ tasks: initialTasks, members, workspaceId }: TaskListClientProps) {
@@ -35,7 +37,7 @@ export default function TaskListClient({ tasks: initialTasks, members, workspace
     const [showCreate, setShowCreate] = useState(false);
     const [filterStatus, setFilterStatus] = useState<string>('');
     const [filterPriority, setFilterPriority] = useState<string>('');
-    const [newTask, setNewTask] = useState({ title: '', description: '', priority: 'medium', assigneeUserId: '' });
+    const [newTask, setNewTask] = useState({ title: '', description: '', priority: 'medium', color: 'gray', assigneeUserId: '' });
     const [creating, setCreating] = useState(false);
 
     const filteredTasks = tasks.filter((t) => {
@@ -54,12 +56,13 @@ export default function TaskListClient({ tasks: initialTasks, members, workspace
                 title: newTask.title,
                 description: newTask.description || undefined,
                 priority: newTask.priority,
+                color: newTask.color,
                 assigneeUserId: newTask.assigneeUserId || undefined,
             }),
         });
         if (res.ok) {
             setShowCreate(false);
-            setNewTask({ title: '', description: '', priority: 'medium', assigneeUserId: '' });
+            setNewTask({ title: '', description: '', priority: 'medium', color: 'gray', assigneeUserId: '' });
             router.refresh();
             const data = await res.json();
             setTasks((prev) => [data.task, ...prev]);
@@ -107,7 +110,7 @@ export default function TaskListClient({ tasks: initialTasks, members, workspace
                         </thead>
                         <tbody>
                             {filteredTasks.map((task) => (
-                                <tr key={task.id} onClick={() => router.push(`/workspace/${workspaceId}/tasks/${task.id}`)} style={{ cursor: 'pointer' }} tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') router.push(`/workspace/${workspaceId}/tasks/${task.id}`); }}>
+                                <tr key={task.id} onClick={() => router.push(`/workspace/${workspaceId}/tasks/${task.id}`)} style={{ cursor: 'pointer', borderLeft: task.color !== 'gray' ? `4px solid var(--color-${task.color}, gray)` : '4px solid transparent' }} tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') router.push(`/workspace/${workspaceId}/tasks/${task.id}`); }}>
                                     <td><span className={`status-dot status-${task.status}`} style={{ display: 'inline-block', marginRight: '8px' }} />{STATUS_LABELS[task.status] || task.status}</td>
                                     <td style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{task.title}</td>
                                     <td><span className={`badge badge-${task.priority === 'urgent' ? 'error' : task.priority === 'high' ? 'magenta' : task.priority === 'medium' ? 'warning' : 'cyan'}`}>{task.priority}</span></td>
@@ -142,13 +145,19 @@ export default function TaskListClient({ tasks: initialTasks, members, workspace
                                     </select>
                                 </div>
                                 <div className="form-group">
-                                    <label className="form-label" htmlFor="task-assignee">Assignee</label>
-                                    <select id="task-assignee" className="form-input" value={newTask.assigneeUserId} onChange={(e) => setNewTask({ ...newTask, assigneeUserId: e.target.value })}>
+                                    <label className="form-label" htmlFor="task-color">Color Tag</label>
+                                    <select id="task-color" className="form-input" value={newTask.color} onChange={(e) => setNewTask({ ...newTask, color: e.target.value })}>
+                                        {COLOR_OPTIONS.map((c) => <option key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>)}
+                                    </select>
+                                </div>
+                            </div>
+                            <div className="form-group" style={{ marginTop: 'var(--space-md)', marginBottom: 'var(--space-lg)' }}>
+                                <label className="form-label" htmlFor="task-assignee">Assignee</label>
+                                <select id="task-assignee" className="form-input" value={newTask.assigneeUserId} onChange={(e) => setNewTask({ ...newTask, assigneeUserId: e.target.value })}>
                                         <option value="">Unassigned</option>
                                         {members.map((m) => <option key={m.user_id} value={m.user_id}>{m.profiles?.full_name || m.user_id}</option>)}
                                     </select>
                                 </div>
-                            </div>
                             <div style={{ display: 'flex', gap: 'var(--space-sm)', justifyContent: 'flex-end' }}>
                                 <button type="button" className="btn btn-secondary" onClick={() => setShowCreate(false)}>Cancel</button>
                                 <button type="submit" className="btn btn-primary" disabled={creating}>{creating ? 'Creating...' : 'Create Task'}</button>

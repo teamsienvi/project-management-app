@@ -2,8 +2,8 @@ import './globals.css';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Internal Workspace Project Manager',
-  description: 'Secure multi-user project management for internal team collaboration',
+  title: 'Sienvi Nexus',
+  description: 'Project management for teams',
 };
 
 export default function RootLayout({

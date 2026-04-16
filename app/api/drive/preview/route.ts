@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
         const proxyUrl = `/api/drive/proxy?fileId=${driveFileId}`;
 
         let previewUrl = proxyUrl;
-        let previewType: 'iframe' | 'image' | 'video' | 'audio' | 'pdf' | 'external' = 'iframe';
+        let previewType: 'iframe' | 'image' | 'video' | 'audio' | 'pdf' | 'external' | 'markdown' = 'iframe';
 
         if (mimeType.includes('google-apps.document') ||
             mimeType.includes('google-apps.spreadsheet') ||
@@ -34,8 +34,10 @@ export async function GET(request: NextRequest) {
             previewType = 'video';
         } else if (mimeType.startsWith('audio/')) {
             previewType = 'audio';
-        } else if (mimeType.includes('text/') || mimeType.includes('markdown') ||
-                   name.endsWith('.md') || name.endsWith('.txt') ||
+        } else if (mimeType.includes('markdown') || name.toLowerCase().endsWith('.md')) {
+            previewType = 'markdown';
+        } else if (mimeType.includes('text/') ||
+                   name.endsWith('.txt') ||
                    name.endsWith('.json') || name.endsWith('.csv')) {
             previewType = 'iframe';
         }

@@ -7,9 +7,9 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         <div className="auth-shell">
             <div className="auth-bg-effect" />
             <div className="auth-container">
-                <div className="auth-brand">
-                    <h1 className="gradient-text">⬡ IWPM</h1>
-                    <p className="auth-subtitle">Internal Workspace Project Manager</p>
+                <div className="auth-header">
+                    <h1 className="auth-title">⬡ Sienvi</h1>
+                    <p className="auth-subtitle">Sienvi Nexus</p>
                 </div>
                 <div className="auth-card glass-card">
                     {children}

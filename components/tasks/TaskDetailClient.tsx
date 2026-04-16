@@ -16,6 +16,7 @@ interface TaskDetailClientProps {
 
 const STATUS_OPTIONS = ['todo', 'in_progress', 'review', 'done'] as const;
 const PRIORITY_OPTIONS = ['low', 'medium', 'high', 'urgent'] as const;
+const COLOR_OPTIONS = ['gray', 'red', 'orange', 'amber', 'green', 'blue', 'indigo', 'pink'] as const;
 const STATUS_LABELS: Record<string, string> = { todo: 'To Do', in_progress: 'In Progress', review: 'Review', done: 'Done' };
 
 export default function TaskDetailClient({ task, notes: initialNotes, activity: initialActivity, members, workspaceId, currentUserId }: TaskDetailClientProps) {
@@ -26,6 +27,7 @@ export default function TaskDetailClient({ task, notes: initialNotes, activity: 
         description: task.description || '',
         status: task.status,
         priority: task.priority,
+        color: task.color || 'gray',
         dueDate: task.due_date?.slice(0, 10) || '',
         assigneeUserId: task.assignee_user_id || '',
     });
@@ -46,6 +48,7 @@ export default function TaskDetailClient({ task, notes: initialNotes, activity: 
                 description: form.description || undefined,
                 status: form.status,
                 priority: form.priority,
+                color: form.color,
                 dueDate: form.dueDate ? new Date(form.dueDate).toISOString() : null,
                 assigneeUserId: form.assigneeUserId || null,
             }),
@@ -110,6 +113,12 @@ export default function TaskDetailClient({ task, notes: initialNotes, activity: 
                                         <label className="form-label" htmlFor="edit-priority">Priority</label>
                                         <select id="edit-priority" className="form-input" value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value })}>
                                             {PRIORITY_OPTIONS.map((p) => <option key={p} value={p}>{p.charAt(0).toUpperCase() + p.slice(1)}</option>)}
+                                        </select>
+                                    </div>
+                                    <div className="form-group">
+                                        <label className="form-label" htmlFor="edit-color">Color Tag</label>
+                                        <select id="edit-color" className="form-input" value={form.color} onChange={(e) => setForm({ ...form, color: e.target.value })}>
+                                            {COLOR_OPTIONS.map((c) => <option key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>)}
                                         </select>
                                     </div>
                                 </div>
@@ -183,6 +192,13 @@ export default function TaskDetailClient({ task, notes: initialNotes, activity: 
                             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--font-sm)' }}>
                                 <span style={{ color: 'var(--text-tertiary)' }}>Priority</span>
                                 <span className={`badge badge-${task.priority === 'urgent' ? 'error' : task.priority === 'high' ? 'magenta' : 'warning'}`}>{task.priority}</span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--font-sm)', alignItems: 'center' }}>
+                                <span style={{ color: 'var(--text-tertiary)' }}>Color Tag</span>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 500, color: 'var(--text-secondary)' }}>
+                                    <div style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: `var(--color-${task.color || 'gray'}, gray)` }} />
+                                    {task.color ? task.color.charAt(0).toUpperCase() + task.color.slice(1) : 'Gray'}
+                                </div>
                             </div>
                             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--font-sm)' }}>
                                 <span style={{ color: 'var(--text-tertiary)' }}>Assignee</span>

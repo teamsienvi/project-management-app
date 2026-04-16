@@ -102,6 +102,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
     const navItems = [
         { label: 'Home', href: currentWorkspaceId ? `/workspace/${currentWorkspaceId}` : '/dashboard', icon: '⌂' },
+        { label: 'Sienvi AI', href: '/ai', icon: '✨' },
         ...(currentWorkspaceId
             ? [
                 { label: 'Tasks', href: `/workspace/${currentWorkspaceId}/tasks`, icon: '☑' },
@@ -117,7 +118,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             {/* Sidebar */}
             <aside className={`sidebar ${sidebarCollapsed ? 'collapsed' : ''}`}>
                 <div className="sidebar-header">
-                    <div className="sidebar-brand gradient-text">⬡ IWPM</div>
+                    <div className="sidebar-brand gradient-text">⬡ Sienvi Nexus</div>
                     <button
                         className="btn btn-ghost btn-icon sidebar-toggle"
                         onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
