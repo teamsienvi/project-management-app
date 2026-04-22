@@ -39,6 +39,31 @@ export default function TaskListClient({ tasks: initialTasks, members, workspace
     const [filterPriority, setFilterPriority] = useState<string>('');
     const [newTask, setNewTask] = useState({ title: '', description: '', priority: 'medium', color: 'gray', assigneeUserId: '' });
     const [creating, setCreating] = useState(false);
+    const [suggestingColor, setSuggestingColor] = useState(false);
+
+    async function handleSuggestColor() {
+        if (!newTask.title.trim()) return;
+        setSuggestingColor(true);
+        try {
+            const res = await fetch('/api/tasks/suggest-color', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    title: newTask.title,
+                    description: newTask.description,
+                    priority: newTask.priority,
+                }),
+            });
+            const data = await res.json();
+            if (res.ok && data.suggestion?.color) {
+                setNewTask((prev) => ({ ...prev, color: data.suggestion.color }));
+            }
+        } catch (err) {
+            console.error('Failed to suggest color:', err);
+        } finally {
+            setSuggestingColor(false);
+        }
+    }
 
     const filteredTasks = tasks.filter((t) => {
         if (filterStatus && t.status !== filterStatus) return false;
@@ -146,9 +171,14 @@ export default function TaskListClient({ tasks: initialTasks, members, workspace
                                 </div>
                                 <div className="form-group">
                                     <label className="form-label" htmlFor="task-color">Color Tag</label>
-                                    <select id="task-color" className="form-input" value={newTask.color} onChange={(e) => setNewTask({ ...newTask, color: e.target.value })}>
-                                        {COLOR_OPTIONS.map((c) => <option key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>)}
-                                    </select>
+                                    <div style={{ display: 'flex', gap: 'var(--space-xs)' }}>
+                                        <select id="task-color" className="form-input" value={newTask.color} onChange={(e) => setNewTask({ ...newTask, color: e.target.value })} style={{ flex: 1 }}>
+                                            {COLOR_OPTIONS.map((c) => <option key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>)}
+                                        </select>
+                                        <button type="button" className="btn btn-ghost btn-sm" onClick={handleSuggestColor} disabled={suggestingColor || !newTask.title.trim()} title="AI Color Suggestion" style={{ fontSize: 12, whiteSpace: 'nowrap' }}>
+                                            {suggestingColor ? '⏳' : '✨ AI'}
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                             <div className="form-group" style={{ marginTop: 'var(--space-md)', marginBottom: 'var(--space-lg)' }}>

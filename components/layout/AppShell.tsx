@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import ToastProvider from '@/components/notifications/ToastProvider';
 import './app-layout.css';
 
 interface Workspace {
@@ -42,6 +43,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     const [showNotifications, setShowNotifications] = useState(false);
     const [showUserMenu, setShowUserMenu] = useState(false);
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+    const [userId, setUserId] = useState<string | undefined>(undefined);
     const notifRef = useRef<HTMLDivElement>(null);
     const userMenuRef = useRef<HTMLDivElement>(null);
 
@@ -51,6 +53,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     const loadData = useCallback(async () => {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
+        setUserId(user.id);
 
         const [profileRes, workspacesRes, notifRes] = await Promise.all([
             supabase.from('profiles').select('*').eq('id', user.id).single(),
@@ -62,6 +65,27 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         if (workspacesRes.data) setWorkspaces(workspacesRes.data as unknown as Workspace[]);
         if (notifRes.data) setNotifications(notifRes.data);
     }, [supabase]);
+
+    // Realtime subscription: update notification badge count live
+    useEffect(() => {
+        if (!userId) return;
+        const channel = supabase
+            .channel('shell-notifications')
+            .on('postgres_changes', {
+                event: 'INSERT',
+                schema: 'public',
+                table: 'notifications',
+                filter: `user_id=eq.${userId}`,
+            }, (payload) => {
+                const n = payload.new as any;
+                setNotifications((prev) => [{
+                    id: n.id, type: n.type, title: n.title,
+                    body: n.body, read_at: null, created_at: n.created_at,
+                }, ...prev]);
+            })
+            .subscribe();
+        return () => { supabase.removeChannel(channel); };
+    }, [userId, supabase]);
 
     useEffect(() => {
         loadData();
@@ -102,10 +126,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
     const navItems = [
         { label: 'Home', href: currentWorkspaceId ? `/workspace/${currentWorkspaceId}` : '/dashboard', icon: '⌂' },
+        { label: 'Calendar', href: '/calendar', icon: '📅' },
         { label: 'Sienvi AI', href: '/ai', icon: '✨' },
         ...(currentWorkspaceId
             ? [
                 { label: 'Tasks', href: `/workspace/${currentWorkspaceId}/tasks`, icon: '☑' },
+                { label: 'Meetings', href: `/workspace/${currentWorkspaceId}/meetings`, icon: '🎤' },
                 { label: 'Storyboards', href: `/workspace/${currentWorkspaceId}/storyboards`, icon: '▦' },
                 { label: 'Files', href: `/workspace/${currentWorkspaceId}/files`, icon: '◫' },
                 { label: 'Members', href: `/workspace/${currentWorkspaceId}/members`, icon: '⊕' },
@@ -225,6 +251,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                                 <div className="dropdown-menu notif-dropdown">
                                     <div className="notif-header">
                                         <span className="notif-title">Notifications</span>
+                                        <button
+                                            className="btn btn-ghost"
+                                            style={{ fontSize: 11, padding: '2px 8px', color: 'var(--text-link)' }}
+                                            onClick={() => { setShowNotifications(false); router.push('/notifications'); }}
+                                        >
+                                            View All
+                                        </button>
                                     </div>
                                     {notifications.length === 0 ? (
                                         <div className="notif-empty">No notifications</div>
@@ -286,6 +319,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     {children}
                 </main>
             </div>
+
+            {/* Toast notification system */}
+            <ToastProvider userId={userId} />
         </div>
     );
 }

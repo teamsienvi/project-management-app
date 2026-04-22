@@ -1,5 +1,5 @@
 import { google } from '@ai-sdk/google';
-import { streamText, tool, smoothStream } from 'ai';
+import { streamText, tool, smoothStream, convertToModelMessages } from 'ai';
 import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
 import { listFolderContents } from '@/lib/google-drive/service';
@@ -70,11 +70,13 @@ Always be concise, professional, and use clear markdown formatting.
 If the user asks about a specific document or file, use the 'list_drive_files' tool to find the document, then use the 'read_drive_document' tool to extract its contents.
 If the user asks to create or assign a task, use the 'create_workspace_task' tool. If the assignee name is not found, you must tell the user and ask them to clarify based on the available members list provided by the tool error.`;
 
+    const modelMessages = await convertToModelMessages(messages);
+
     const result = streamText({
-        model: google('gemini-2.5-flash'),
+        model: google('gemini-1.5-flash'),
         system: systemPrompt,
-        messages,
-        experimental_transform: smoothStream(),
+        messages: modelMessages,
+        maxSteps: 5,
         onFinish: async (event) => {
             // Save the AI response once finished
             try {
@@ -167,12 +169,22 @@ If the user asks to create or assign a task, use the 'create_workspace_task' too
                 // @ts-expect-error - Vercel AI SDK generic overload mismatch
                 execute: async ({ folderId }) => {
                     const targetFolder = folderId || workspace?.google_drive_root_folder_id;
-                    if (!targetFolder) return { error: 'No Drive folder linked to this workspace.' };
+                    console.log('list_drive_files called. FolderId:', folderId, 'Workspace root:', workspace?.google_drive_root_folder_id, 'Target:', targetFolder);
+                    
+                    if (!targetFolder) {
+                        console.error('No Drive folder linked to this workspace.');
+                        return { error: 'No Drive folder linked to this workspace.' };
+                    }
 
                     try {
                         const contents = await listFolderContents(targetFolder);
+                        console.log('Successfully fetched drive contents. Count:', contents.length);
+                        if (contents.length === 0) {
+                            return { success: true, message: 'The folder is currently empty. There are no files or subfolders here.' };
+                        }
                         return { success: true, files: contents };
-                    } catch (error) {
+                    } catch (error: any) {
+                        console.error('Failed to fetch drive contents:', error.message);
                         return { error: 'Failed to fetch drive contents. Is the Drive service configured properly?' };
                     }
                 },

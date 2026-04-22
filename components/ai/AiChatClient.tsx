@@ -34,7 +34,6 @@ export default function AiChatClient({ workspaces, initialHistory }: { workspace
     const { messages, setMessages, sendMessage, status } = useChat({
         id: selectedConvId || 'new',
         transport,
-        maxSteps: 5,
         onFinish({ message }: { message: UIMessage }) {
             // Check for conversation ID from the response
             const lastPart = message.parts?.find((p: any) => p.type === 'text');

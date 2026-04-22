@@ -95,3 +95,159 @@ export async function sendInviteEmail(params: InviteEmailParams): Promise<boolea
         return false;
     }
 }
+
+// ── Shared HTML wrapper for all notification emails ──
+
+function emailWrapper(title: string, bodyHtml: string, ctaUrl?: string, ctaLabel?: string): string {
+    const ctaBlock = ctaUrl && ctaLabel ? `
+        <table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center">
+            <a href="${ctaUrl}" style="display:inline-block;padding:12px 32px;background:linear-gradient(135deg,#00e5ff,#e040fb);color:#000000;font-weight:700;font-size:15px;border-radius:8px;text-decoration:none;">
+                ${ctaLabel}
+            </a>
+        </td></tr></table>` : '';
+
+    return `<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background:#0e0e12;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#0e0e12;padding:40px 20px;">
+    <tr><td align="center">
+      <table width="480" cellpadding="0" cellspacing="0" style="background:#1a1a24;border-radius:12px;border:1px solid rgba(255,255,255,0.06);">
+        <tr><td style="padding:32px 32px 0;text-align:center;">
+          <h1 style="margin:0;font-size:24px;font-weight:800;letter-spacing:-0.03em;">
+            <span style="background:linear-gradient(135deg,#00e5ff,#e040fb);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">⬡ ${APP_NAME}</span>
+          </h1>
+        </td></tr>
+        <tr><td style="padding:24px 32px;">
+          ${bodyHtml}
+          ${ctaBlock}
+        </td></tr>
+      </table>
+      <p style="margin:24px 0 0;color:#444458;font-size:11px;text-align:center;">
+        Sent by ${APP_NAME}
+      </p>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+}
+
+/**
+ * Send notification when a task is assigned to a user.
+ */
+export async function sendTaskAssignedEmail(params: {
+    to: string;
+    taskTitle: string;
+    assignerName: string | null;
+    workspaceName: string;
+    taskUrl: string;
+}): Promise<boolean> {
+    const resend = getResend();
+    if (!resend) return false;
+
+    const { to, taskTitle, assignerName, workspaceName, taskUrl } = params;
+    const assigner = assignerName || 'Someone';
+
+    const bodyHtml = `
+        <h2 style="margin:0 0 16px;color:#ffffff;font-size:20px;font-weight:600;">New Task Assigned</h2>
+        <p style="margin:0 0 8px;color:#a0a0b8;font-size:15px;line-height:1.6;">
+            <strong style="color:#ffffff;">${assigner}</strong> assigned you a task in <strong style="color:#00e5ff;">${workspaceName}</strong>:
+        </p>
+        <div style="margin:16px 0 24px;padding:12px 16px;background:#0e0e12;border-radius:8px;border-left:4px solid #00e5ff;">
+            <p style="margin:0;color:#ffffff;font-size:16px;font-weight:600;">${taskTitle}</p>
+        </div>`;
+
+    try {
+        await resend.emails.send({
+            from: `${APP_NAME} <${FROM_EMAIL}>`,
+            to,
+            replyTo: REPLY_TO,
+            subject: `You've been assigned: ${taskTitle}`,
+            html: emailWrapper('Task Assigned', bodyHtml, taskUrl, 'View Task'),
+        });
+        return true;
+    } catch (err) {
+        console.error('[email] Failed to send task assigned email:', err);
+        return false;
+    }
+}
+
+/**
+ * Send notification when a task is completed.
+ */
+export async function sendTaskCompletedEmail(params: {
+    to: string;
+    taskTitle: string;
+    completedByName: string | null;
+    workspaceName: string;
+    taskUrl: string;
+}): Promise<boolean> {
+    const resend = getResend();
+    if (!resend) return false;
+
+    const { to, taskTitle, completedByName, workspaceName, taskUrl } = params;
+    const completer = completedByName || 'A team member';
+
+    const bodyHtml = `
+        <h2 style="margin:0 0 16px;color:#ffffff;font-size:20px;font-weight:600;">✅ Task Completed</h2>
+        <p style="margin:0 0 8px;color:#a0a0b8;font-size:15px;line-height:1.6;">
+            <strong style="color:#ffffff;">${completer}</strong> completed a task in <strong style="color:#10b981;">${workspaceName}</strong>:
+        </p>
+        <div style="margin:16px 0 24px;padding:12px 16px;background:#0e0e12;border-radius:8px;border-left:4px solid #10b981;">
+            <p style="margin:0;color:#ffffff;font-size:16px;font-weight:600;">${taskTitle}</p>
+        </div>`;
+
+    try {
+        await resend.emails.send({
+            from: `${APP_NAME} <${FROM_EMAIL}>`,
+            to,
+            replyTo: REPLY_TO,
+            subject: `Task completed: ${taskTitle}`,
+            html: emailWrapper('Task Completed', bodyHtml, taskUrl, 'View Task'),
+        });
+        return true;
+    } catch (err) {
+        console.error('[email] Failed to send task completed email:', err);
+        return false;
+    }
+}
+
+/**
+ * Send notification when a file is uploaded to a workspace.
+ */
+export async function sendFileUploadedEmail(params: {
+    to: string;
+    fileName: string;
+    uploaderName: string | null;
+    workspaceName: string;
+    fileUrl: string;
+}): Promise<boolean> {
+    const resend = getResend();
+    if (!resend) return false;
+
+    const { to, fileName, uploaderName, workspaceName, fileUrl } = params;
+    const uploader = uploaderName || 'A team member';
+
+    const bodyHtml = `
+        <h2 style="margin:0 0 16px;color:#ffffff;font-size:20px;font-weight:600;">📎 New File Uploaded</h2>
+        <p style="margin:0 0 8px;color:#a0a0b8;font-size:15px;line-height:1.6;">
+            <strong style="color:#ffffff;">${uploader}</strong> uploaded a new file to <strong style="color:#8b5cf6;">${workspaceName}</strong>:
+        </p>
+        <div style="margin:16px 0 24px;padding:12px 16px;background:#0e0e12;border-radius:8px;border-left:4px solid #8b5cf6;">
+            <p style="margin:0;color:#ffffff;font-size:16px;font-weight:600;">📄 ${fileName}</p>
+        </div>`;
+
+    try {
+        await resend.emails.send({
+            from: `${APP_NAME} <${FROM_EMAIL}>`,
+            to,
+            replyTo: REPLY_TO,
+            subject: `New file in ${workspaceName}: ${fileName}`,
+            html: emailWrapper('File Uploaded', bodyHtml, fileUrl, 'View File'),
+        });
+        return true;
+    } catch (err) {
+        console.error('[email] Failed to send file uploaded email:', err);
+        return false;
+    }
+}

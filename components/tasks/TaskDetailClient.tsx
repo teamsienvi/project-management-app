@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
+import MarkdownRenderer from '@/components/shared/MarkdownRenderer';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 interface TaskDetailClientProps {
@@ -36,6 +37,31 @@ export default function TaskDetailClient({ task, notes: initialNotes, activity: 
     const [activity, setActivity] = useState(initialActivity);
     const [newNote, setNewNote] = useState('');
     const [addingNote, setAddingNote] = useState(false);
+    const [suggestingColor, setSuggestingColor] = useState(false);
+
+    async function handleSuggestColor() {
+        setSuggestingColor(true);
+        try {
+            const res = await fetch('/api/tasks/suggest-color', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    title: form.title,
+                    description: form.description,
+                    priority: form.priority,
+                    dueDate: form.dueDate,
+                }),
+            });
+            const data = await res.json();
+            if (res.ok && data.suggestion?.color) {
+                setForm((prev) => ({ ...prev, color: data.suggestion.color }));
+            }
+        } catch (err) {
+            console.error('Failed to suggest color:', err);
+        } finally {
+            setSuggestingColor(false);
+        }
+    }
 
     async function handleSave(e: FormEvent) {
         e.preventDefault();
@@ -100,7 +126,8 @@ export default function TaskDetailClient({ task, notes: initialNotes, activity: 
                                 </div>
                                 <div className="form-group" style={{ marginBottom: 'var(--space-md)' }}>
                                     <label className="form-label" htmlFor="edit-desc">Description</label>
-                                    <textarea id="edit-desc" className="form-input" rows={4} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+                                    <textarea id="edit-desc" className="form-input" rows={4} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Supports **markdown** formatting" />
+                                    <div className="form-hint">Markdown supported: **bold**, *italic*, `code`, lists, links</div>
                                 </div>
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-md)', marginBottom: 'var(--space-md)' }}>
                                     <div className="form-group">
@@ -117,9 +144,14 @@ export default function TaskDetailClient({ task, notes: initialNotes, activity: 
                                     </div>
                                     <div className="form-group">
                                         <label className="form-label" htmlFor="edit-color">Color Tag</label>
-                                        <select id="edit-color" className="form-input" value={form.color} onChange={(e) => setForm({ ...form, color: e.target.value })}>
-                                            {COLOR_OPTIONS.map((c) => <option key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>)}
-                                        </select>
+                                        <div style={{ display: 'flex', gap: 'var(--space-xs)' }}>
+                                            <select id="edit-color" className="form-input" value={form.color} onChange={(e) => setForm({ ...form, color: e.target.value })} style={{ flex: 1 }}>
+                                                {COLOR_OPTIONS.map((c) => <option key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>)}
+                                            </select>
+                                            <button type="button" className="btn btn-ghost btn-sm" onClick={handleSuggestColor} disabled={suggestingColor} title="AI Color Suggestion" style={{ fontSize: 12, whiteSpace: 'nowrap' }}>
+                                                {suggestingColor ? '⏳' : '✨ AI'}
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-md)', marginBottom: 'var(--space-md)' }}>
@@ -151,7 +183,11 @@ export default function TaskDetailClient({ task, notes: initialNotes, activity: 
                                         )}
                                     </div>
                                 </div>
-                                {task.description && <p style={{ color: 'var(--text-secondary)', marginTop: 'var(--space-md)', whiteSpace: 'pre-wrap' }}>{task.description}</p>}
+                                {task.description && (
+                                    <div style={{ marginTop: 'var(--space-md)' }}>
+                                        <MarkdownRenderer content={task.description} />
+                                    </div>
+                                )}
                             </>
                         )}
                     </div>
